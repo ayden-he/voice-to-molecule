@@ -1,11 +1,13 @@
-"""Interruptible macOS speech, with a silent fallback when say is unavailable."""
+"""Interruptible platform speech, with a text-only fallback when unavailable."""
 
 import re
 import subprocess
+import sys
 from typing import Optional
 
 
 RATE = 180
+PLATFORM = sys.platform
 QUIET = False
 _process: Optional[subprocess.Popen] = None
 _unavailable = False
@@ -46,6 +48,20 @@ def set_rate(wpm: int) -> int:
     return RATE
 
 
+def _command(text: str) -> list[str]:
+    if PLATFORM == "darwin":
+        return ["say", "-r", str(RATE), "--", text]
+    if PLATFORM == "win32":
+        rate = round((RATE - 100) * 20 / 300 - 10)
+        escaped = text.replace("'", "''")
+        script = ("Add-Type -AssemblyName System.Speech; "
+                  "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                  "$s.Rate = {}; $s.Speak('{}')").format(rate, escaped)
+        return ["powershell", "-NoProfile", "-Command", script]
+    linux_rate = round((RATE - 100) * 200 / 300 - 100)
+    return ["spd-say", "--wait", "-r", str(linux_rate), "--", text]
+
+
 def speak(text: str) -> None:
     """Replace earlier speech without waiting for the new speech to finish."""
     global _process, _unavailable
@@ -60,7 +76,7 @@ def speak(text: str) -> None:
     try:
         # -- prevents leading dashes in text from being interpreted as options.
         _process = subprocess.Popen(
-            ["say", "-r", str(RATE), "--", cleaned],
+            _command(cleaned),
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
     except OSError:

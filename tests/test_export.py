@@ -1,4 +1,4 @@
-"""Real PNG drawing with all macOS window-opening calls mocked."""
+"""Real PNG drawing with all platform window-opening calls mocked."""
 
 import subprocess
 from unittest.mock import Mock
@@ -22,6 +22,7 @@ def acetone():
 
 @pytest.fixture(autouse=True)
 def no_windows(monkeypatch):
+    monkeypatch.setattr(export, "PLATFORM", "darwin")
     opener = Mock()
     monkeypatch.setattr(export.subprocess, "run", opener)
     return opener
@@ -86,13 +87,39 @@ def test_invalid_path(acetone, tmp_path, kind):
     assert message
 
 
-def test_show_uses_argument_list(acetone, tmp_path, no_windows):
+def test_show_uses_argument_list(acetone, tmp_path, no_windows, monkeypatch):
+    monkeypatch.setattr(export, "PLATFORM", "darwin")
     path = tmp_path / "with spaces" / "current.png"
     assert export.show_image(acetone, path)[0]
     no_windows.assert_called_once_with(
         ["open", str(path.resolve())], check=True,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
+
+
+def test_show_linux(acetone, tmp_path, no_windows, monkeypatch):
+    monkeypatch.setattr(export, "PLATFORM", "linux")
+    path = tmp_path / "with spaces" / "current.png"
+    assert export.show_image(acetone, path)[0]
+    no_windows.assert_called_once_with(
+        ["xdg-open", str(path.resolve())], check=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+
+def test_show_windows(acetone, tmp_path, no_windows, monkeypatch):
+    monkeypatch.setattr(export, "PLATFORM", "win32")
+    opener = Mock()
+    monkeypatch.setattr(export.os, "startfile", opener, raising=False)
+    path = tmp_path / "with spaces" / "current.png"
+    assert export.show_image(acetone, path)[0]
+    opener.assert_called_once_with(str(path.resolve()))
+    no_windows.assert_not_called()
+    opener.side_effect = OSError("No viewer")
+    assert export.show_image(acetone, path) == (
+        False, "Could not open the molecule image. It is still saved on disk.",
+    )
+    assert path.exists()
 
 
 @pytest.mark.parametrize("error", [FileNotFoundError(), subprocess.CalledProcessError(1, "open")])

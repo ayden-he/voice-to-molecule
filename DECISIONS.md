@@ -376,3 +376,20 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   environment on PATH, the same command reports **435 passed, 1 failed**. The
   updated aromatic-edit test fails at `assert ok is False`; 436 passing tests
   cannot be confirmed with the exact requested implementation.
+
+## Cross-platform speech and image opening
+
+- **Decision:** Speech and image opening now select platform commands through a
+  pinnable module-level `PLATFORM` value. macOS behavior and command arguments
+  remain unchanged. Windows speech uses PowerShell System.Speech, with embedded
+  single quotes doubled inside the spoken string; Windows image opening uses
+  `os.startfile`. Linux uses `spd-say` for speech and `xdg-open` for images.
+- **Behavior:** Commands receive data through argument lists or an escaped
+  PowerShell string literal, without shell execution. Speech still starts with
+  non-blocking `Popen`, supports interruption, and warns only once before falling
+  back to text when an engine cannot be launched on any OS. Image-launch failures
+  retain the saved image and return the existing graceful failure message.
+- **Validation:** With the project's Python 3.9.6 virtual environment on PATH,
+  `python3 -m pytest -q` reports **444 passed**. Tests pin platforms and mock all
+  speech and viewer launches, including Windows quote escaping, Linux arguments,
+  and missing-engine fallback on macOS, Windows, and Linux.

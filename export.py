@@ -1,7 +1,9 @@
-"""Draw numbered skeletal structures and open them with macOS."""
+"""Draw numbered skeletal structures and open them with the platform viewer."""
 
+import os
 from pathlib import Path
 import subprocess
+import sys
 from typing import Tuple, Union
 
 from rdkit.Chem.Draw import rdMolDraw2D
@@ -10,6 +12,16 @@ from builder import Builder
 
 
 CURRENT_IMAGE = Path("outputs/current.png")
+PLATFORM = sys.platform
+
+
+def _open_file(path):
+    if PLATFORM == "win32":
+        os.startfile(str(path))
+    else:
+        command = "open" if PLATFORM == "darwin" else "xdg-open"
+        subprocess.run([command, str(path)], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def save_image(builder: Builder, path: Union[str, Path]) -> Tuple[bool, str]:
@@ -45,8 +57,7 @@ def show_image(builder: Builder, path: Union[str, Path] = CURRENT_IMAGE) -> Tupl
     if not success:
         return False, message
     try:
-        subprocess.run(["open", str(Path(path).resolve())], check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        _open_file(Path(path).resolve())
         return True, "Opened the current molecule image."
     except (OSError, subprocess.SubprocessError):
         return False, "Could not open the molecule image. It is still saved on disk."
