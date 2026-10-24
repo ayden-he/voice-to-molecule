@@ -21,7 +21,7 @@ def test_empty():
 
 def test_single_carbon():
     builder = molecule([("C", 1)])
-    assert summary(builder) == "1 carbon, 1 atom in total, 4 hydrogens."
+    assert summary(builder) == "1 carbon and 4 hydrogens."
     assert detail(builder) == (
         "Atom 1, carbon, with 4 hydrogens, not bonded to anything yet. "
         "The current atom is atom 1, carbon."
@@ -30,7 +30,7 @@ def test_single_carbon():
 
 def test_ethanol():
     builder = molecule([("C", 1), ("C", 1), ("O", 1)])
-    assert summary(builder) == "2 carbons and 1 oxygen, 3 atoms in total, 6 hydrogens."
+    assert summary(builder) == "2 carbons, 1 oxygen, and 6 hydrogens."
     assert detail(builder) == (
         "Atom 1, carbon, with 3 hydrogens, bonded to atom 2 by a single bond. "
         "Atom 2, carbon, with 2 hydrogens, bonded to atom 1 by a single bond "
@@ -44,7 +44,7 @@ def test_acetone():
     builder = molecule([("C", 1), ("C", 1), ("C", 1)])
     assert builder.go_to(2)[0]
     assert builder.add_atom("O", 2)[0]
-    assert summary(builder) == "3 carbons and 1 oxygen, 4 atoms in total, 6 hydrogens."
+    assert summary(builder) == "3 carbons, 1 oxygen, and 6 hydrogens."
     assert detail(builder) == (
         "Atom 1, carbon, with 3 hydrogens, bonded to atom 2 by a single bond. "
         "Atom 2, carbon, with no hydrogens, bonded to atom 1 by a single bond, "
@@ -66,7 +66,7 @@ def test_acetone():
 ])
 def test_propene_and_propyne(order, word, middle_hydrogens, last_hydrogens, total):
     builder = molecule([("C", 1), ("C", 1), ("C", order)])
-    assert summary(builder) == "3 carbons, 3 atoms in total, {} hydrogens.".format(total)
+    assert summary(builder) == "3 carbons and {} hydrogens.".format(total)
     assert detail(builder) == (
         "Atom 1, carbon, with 3 hydrogens, bonded to atom 2 by a single bond. "
         "Atom 2, carbon, with {}, bonded to atom 1 by a single bond "
@@ -78,9 +78,9 @@ def test_propene_and_propyne(order, word, middle_hydrogens, last_hydrogens, tota
 
 def test_singular_and_plural_oxygen():
     builder = molecule([("O", 1)])
-    assert summary(builder) == "1 oxygen, 1 atom in total, 2 hydrogens."
+    assert summary(builder) == "1 oxygen and 2 hydrogens."
     assert builder.add_atom("O")[0]
-    assert summary(builder) == "2 oxygens, 2 atoms in total, 2 hydrogens."
+    assert summary(builder) == "2 oxygens and 2 hydrogens."
     assert detail(builder) == (
         "Atom 1, oxygen, with 1 hydrogen, bonded to atom 2 by a single bond. "
         "Atom 2, oxygen, with 1 hydrogen, bonded to atom 1 by a single bond. "

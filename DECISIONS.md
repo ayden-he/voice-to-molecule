@@ -424,3 +424,10 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
 - Validation: `python3 -m pytest -q` with the Python 3.9.6 project environment
   reports **637 passed**, covering every entry, synonyms, invalid input,
   element restrictions, undo, parser commands, and terminal/API integration.
+
+## Summary wording
+
+- Removed the atom count from `summary()` because "N atoms in total" was
+  ambiguous: it counted only user-placed carbon/oxygen, not implicit hydrogens.
+  Summary now reports composition and hydrogen count only; `detail()` is
+  unchanged. Updated only the six corresponding summary expectations.
