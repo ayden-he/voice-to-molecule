@@ -1,5 +1,17 @@
 # Decisions
 
+## Spoken startup instructions
+
+- Attempt a browser-TTS welcome when the voice page opens, explaining microphone
+  activation, permission, Start, command examples, Pause, Undo, and Stop.
+- Browser autoplay policy may reject speech before interaction. Retry after a
+  pointer/keyboard interaction on a not-allowed error and provide an explicit
+  keyboard-accessible Hear startup instructions button plus written guidance.
+  Stop retries when the user starts the microphone, submits typed input, mutes
+  speech, or leaves. Replaying the guide turns off recording to avoid commands
+  being recognized from the instructions. No AI requests or quota are needed.
+  Reference: https://chromestatus.com/feature/5687444770914304
+
 ## Merge main into the Gemini voice branch
 
 - Preserve the explicitly approved AI interpretation route and main's expanded

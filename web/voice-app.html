@@ -10,8 +10,11 @@ button,input { font: inherit; padding: .5rem; margin: .3rem; }
 img { width: 100%; max-width: 800px; background: white; }
 </style>
 <h1>Voice-to-Molecule</h1>
-<p>Enable your microphone, then say Start. Say Pause to suspend commands,
+<p id="startup-instructions">Activate Enable microphone and allow microphone access if asked, then say Start.
+Say a command such as add carbon. Say Pause to suspend commands,
 Start to resume, Undo to reverse one command, and Stop to turn the microphone off.</p>
+<button id="welcome" aria-describedby="startup-instructions">Hear startup instructions</button>
+<p id="startup-hint" role="status">If the welcome is silent, activate Hear startup instructions. Replaying instructions turns off the microphone.</p>
 <p>Chrome transcribes speech. Gemini 3.5 Flash-Lite interprets the text; RDKit validates edits.
 Audio may go to Chrome’s speech provider and transcripts go to Google Gemini.</p>
 <button id="enable">Enable microphone</button>

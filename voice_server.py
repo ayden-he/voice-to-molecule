@@ -59,7 +59,8 @@ def make_server(port=8001, interpret=None):
                 self.send(200, body, "application/json" if path == "/state" else "image/svg+xml")
                 return
             files = {"/": "voice-app.html", "/voice-app.html": "voice-app.html",
-                     "/voice-app.mjs": "voice-app.mjs", "/session.mjs": "session.mjs"}
+                     "/voice-app.mjs": "voice-app.mjs", "/session.mjs": "session.mjs",
+                     "/startup.mjs": "startup.mjs"}
             if path not in files:
                 self.send(404, '{}')
                 return

@@ -1,4 +1,5 @@
 import { createSession } from './session.mjs';
+import { startupInstructions } from './startup.mjs';
 
 const get = id => document.getElementById(id);
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -8,15 +9,18 @@ let speaking = false;
 let lastVersion = -1;
 let spokenText = '';
 function stopSpeech() { window.speechSynthesis?.cancel(); speaking = false; }
-function say(text) {
+function say(text, { onStart, onError } = {}) {
   get('feedback').textContent = text;
-  if (!get('spoken').checked || !window.speechSynthesis) return;
+  if (!get('spoken').checked || !window.speechSynthesis) return false;
   stopSpeech();
   const speech = new SpeechSynthesisUtterance(text);
   spokenText = text.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
   speaking = true;
-  speech.onend = speech.onerror = () => { speaking = false; };
+  speech.onstart = () => { onStart?.(); };
+  speech.onend = () => { speaking = false; };
+  speech.onerror = event => { speaking = false; onError?.(event); };
   window.speechSynthesis.speak(speech);
+  return true;
 }
 function render(state) {
   get('queued').textContent = state.queued.length ? `Queued: ${state.queued.join('; ')}` : '';
@@ -104,6 +108,7 @@ function listen() {
   catch { session.stopped(); get('status').textContent = 'Could not start speech recognition. Use typed input.'; }
 }
 get('enable').onclick = () => {
+  welcome.dismiss();
   if (!Recognition) { get('status').textContent = 'Speech recognition unavailable. Use typed input.'; return; }
   stopSpeech();
   capture = true;
@@ -115,6 +120,8 @@ get('enable').onclick = () => {
 get('stop').onclick = () => session.receive('stop');
 get('form').onsubmit = event => {
   event.preventDefault();
+  welcome.dismiss();
+  stopSpeech();
   const text = get('text').value.trim();
   // Typed requests work without microphone activation, with identical ordering.
   if (session.mode() === 'off' && !['stop', 'pause'].includes(text.toLowerCase())) {
@@ -123,8 +130,19 @@ get('form').onsubmit = event => {
   hear(text);
   get('text').value = '';
 };
-get('spoken').onchange = () => { if (!get('spoken').checked) stopSpeech(); };
-window.addEventListener('pagehide', () => { disableMic(); stopSpeech(); });
+get('spoken').onchange = () => { if (!get('spoken').checked) { welcome.dismiss(); stopSpeech(); } };
+window.addEventListener('pagehide', () => { welcome.dismiss(); disableMic(); stopSpeech(); });
 fetch('/state').then(response => response.json()).then(render).catch(() => {
   get('status').textContent = 'Could not connect to the local server.';
 });
+const welcome = startupInstructions({
+  speak: say,
+  listen: (type, handler) => document.addEventListener(type, handler),
+  unlisten: (type, handler) => document.removeEventListener(type, handler),
+  hint: message => { get('startup-hint').textContent = message; },
+});
+get('welcome').onclick = () => {
+  // Replaying the instructions turns the mic off to avoid hearing the guide.
+  if (capture) session.receive('stop');
+  welcome.replay();
+};

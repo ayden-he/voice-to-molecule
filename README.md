@@ -13,7 +13,12 @@ $env:GEMINI_API_KEY = [System.Net.NetworkCredential]::new("", $geminiSecret).Pas
 ```
 
 Open http://127.0.0.1:8001/ in Chrome. This is the real molecule app, separate
-from the earlier fake-service demo on port 8000. Use headphones, enable the
+from the earlier fake-service demo on port 8000. The page attempts a spoken
+welcome explaining how to begin. If Chrome blocks automatic speech, press a
+key or activate **Hear startup instructions**. Replaying the guide turns off
+the microphone. Written instructions remain available.
+
+Use headphones, enable the
 microphone, then say **Start** as a separate utterance. Say "add a carbon then
 add oxygen". Each action updates the numbered drawing. Say **Undo** to reverse
 the last action, **Pause** to suspend commands, **Start** to resume, and **Stop**
