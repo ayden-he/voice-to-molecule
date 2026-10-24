@@ -73,6 +73,16 @@ def parse(text: str) -> Optional[Dict[str, Any]]:
     if not isinstance(text, str):
         return None
 
+    # "build <name>" / "load <name>" / "make <name>": look up a named molecule
+    # from the curated library. Checked first, before the signed-number guard,
+    # because library names legitimately contain hyphens and digits (e.g.
+    # propan-2-ol). The parser only extracts the name; main.py and api.py resolve
+    # it so parsing stays independent of the library contents.
+    named_normalized = " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
+    named = re.fullmatch(r"(?:build|load|make) (.+)", named_normalized)
+    if named:
+        return {"action": "load_named", "name": named.group(1)}
+
     # Do not turn negative, signed, or decimal numbers into valid atom numbers
     # when removing punctuation. Hyphens in double-bond remain supported.
     if re.search(r"[+\-−]\s*[0-9]|[0-9][.,][0-9]", text):

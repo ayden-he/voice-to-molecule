@@ -116,6 +116,35 @@ class Builder:
     def reset(self):
         return self._commit(Chem.RWMol(), None, "Started over with an empty molecule.")
 
+    def load_molecule(self, smiles):
+        """Replace the molecule from a SMILES string, as one undoable action.
+
+        Used by the named-molecule library. The structure still goes through the
+        same valence and sanitize checks as every other edit, and must contain
+        only carbon and oxygen (hydrogens implicit); anything else is rejected so
+        the C/O/H scope cannot be bypassed through the library.
+        """
+        if not isinstance(smiles, str) or not smiles:
+            return False, "That molecule could not be loaded."
+        parsed = Chem.MolFromSmiles(smiles)
+        if parsed is None:
+            return False, "That molecule could not be loaded."
+        for atom in parsed.GetAtoms():
+            if atom.GetSymbol() not in ("C", "O"):
+                return False, "Only carbon and oxygen can be added. Hydrogens are added automatically."
+        # Store explicit single/double bonds so the valence check in _commit does
+        # not read aromatic bonds as 1.5 and wrongly flag fused rings (e.g.
+        # naphthalene). _commit re-sanitizes and re-kekulizes the result.
+        try:
+            Chem.Kekulize(parsed, clearAromaticFlags=True)
+        except Exception:
+            return False, "That molecule could not be loaded."
+        candidate = Chem.RWMol(parsed)
+        # Cursor follows the last atom, matching how building leaves the cursor.
+        last = candidate.GetNumAtoms()
+        return self._commit(candidate, last if last else None,
+                            "Loaded the molecule.")
+
     def _compound(self, actions, message):
         """Run ordinary edits on an isolated builder, then commit just once."""
         draft = Builder()

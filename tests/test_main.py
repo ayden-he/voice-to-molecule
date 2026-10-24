@@ -324,3 +324,30 @@ def test_targeted_chain_and_ring_are_atomic(command, expected, capsys):
     assert (builder.smiles(), builder.describe_atoms(), builder.current_atom) == before
     builder.undo()
     assert builder.smiles() == ""
+
+@pytest.mark.parametrize("command, expected", [
+    ("build aspirin", "CC(=O)Oc1ccccc1C(=O)O"),
+    ("load acetic acid", "CC(=O)O"),
+    ("make glucose", "OCC1OC(O)C(O)C(O)C1O"),
+])
+def test_named_molecule_commands_build_structure(command, expected, capsys):
+    builder = Builder()
+    assert text_app.handle_line(command, builder) is True
+    assert Chem.CanonSmiles(builder.smiles()) == Chem.CanonSmiles(expected)
+    assert "SMILES:" in capsys.readouterr().out
+
+def test_unknown_named_molecule_is_reported_and_leaves_state(capsys):
+    builder = Builder()
+    builder.add_atom("C")
+    assert text_app.handle_line("build unobtainium", builder) is True
+    output = capsys.readouterr().out
+    assert "don't have that molecule" in output
+    assert "SMILES:" not in output          # failure prints no SMILES line
+    assert builder.smiles() == "C"           # unchanged
+
+def test_named_molecule_is_undoable(capsys):
+    builder = Builder()
+    text_app.handle_line("build benzene", builder)
+    assert Chem.CanonSmiles(builder.smiles()) == Chem.CanonSmiles("c1ccccc1")
+    builder.undo()
+    assert builder.smiles() == ""

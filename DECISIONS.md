@@ -406,3 +406,21 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   chemistry authority. Added Flask to requirements. On Python 3.9.6,
   `python3 -m pytest -q` reports **456 passed**. The supplied PNG-signature test
   literal was written with escaped newlines to preserve valid Python syntax.
+
+## Curated named-molecule library
+
+- Added `library.py`, a static curated mapping of common names and synonyms to
+  verified C/H/O SMILES. Lookup is punctuation/case-insensitive and never guesses
+  unknown names; no AI or web lookup is involved. `Builder.load_molecule` loads
+  SMILES as one undoable action through the existing sanitize/valence path and
+  enforces C/O-only atoms with implicit hydrogens. Aromatic structures are
+  kekulized before valence checks, including fused rings such as naphthalene.
+- The parser recognizes `build/load/make <name>` before its signed-number guard
+  so hyphenated names work. Both `main.py` and `api.py` resolve names through the
+  library and call the Builder. Unknown names leave the molecule unchanged.
+  Sugars and menthol are connectivity-only, with no stereochemistry, matching
+  project scope. Alternatives were guessing names or generating structures;
+  fixed lookup keeps behavior deterministic and RDKit the chemistry authority.
+- Validation: `python3 -m pytest -q` with the Python 3.9.6 project environment
+  reports **637 passed**, covering every entry, synonyms, invalid input,
+  element restrictions, undo, parser commands, and terminal/API integration.

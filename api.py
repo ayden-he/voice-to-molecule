@@ -13,6 +13,7 @@ from flask import Flask, jsonify, request, Response
 from rdkit.Chem.Draw import rdMolDraw2D
 
 import export
+import library
 from builder import Builder
 from parser import parse
 from readback import detail, summary
@@ -92,6 +93,13 @@ def run_command(text: str) -> Dict[str, Any]:
 
 def _dispatch_edit(action: str, command: Dict[str, Any]) -> Tuple[bool, str]:
     """Route a state-changing action to the matching Builder method."""
+    if action == "load_named":
+        smiles = library.lookup(command["name"])
+        if smiles is None:
+            return False, ("I don't have that molecule in the library. You can "
+                           "build it step by step, or try: aspirin, glucose, "
+                           "acetic acid.")
+        return _builder.load_molecule(smiles)
     if action == "add_atom":
         return _builder.add_atom(command["symbol"], command["bond_order"], command.get("to_atom"))
     if action == "add_chain":

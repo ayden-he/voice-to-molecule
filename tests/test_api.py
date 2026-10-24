@@ -108,3 +108,23 @@ def test_terminal_only_commands_are_polite(client):
         data = post(client, text).get_json()
         assert data["ok"] is True
         assert "website" in data["message"]
+
+def test_build_named_molecule_over_api(client):
+    data = post(client, "build aspirin").get_json()
+    assert data["ok"] is True
+    assert Chem.CanonSmiles(data["smiles"]) == Chem.CanonSmiles("CC(=O)Oc1ccccc1C(=O)O")
+
+def test_unknown_named_molecule_over_api_is_graceful(client):
+    post(client, "add carbon")
+    data = post(client, "build unobtainium").get_json()
+    assert data["ok"] is False
+    assert "don't have that molecule" in data["message"]
+    assert data["smiles"] == "C"            # unchanged
+
+def test_named_molecule_rejects_hidden_non_co(client, monkeypatch):
+    # Even if the library were tampered with, load_molecule enforces C/O only.
+    import library
+    monkeypatch.setitem(library._INDEX, "fake", "CCN")
+    data = post(client, "build fake").get_json()
+    assert data["ok"] is False
+    assert "carbon and oxygen" in data["message"]

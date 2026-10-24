@@ -4,6 +4,7 @@ import argparse
 from typing import List, Optional
 
 import export
+import library
 import speech
 from builder import Builder
 from parser import parse
@@ -81,7 +82,15 @@ def handle_line(text: str, builder: Builder) -> bool:
         _report(HELP_TEXT)
         success = True
     else:
-        if action == "add_atom":
+        if action == "load_named":
+            smiles = library.lookup(command["name"])
+            if smiles is None:
+                success, message = False, (
+                    "I don't have that molecule in the library. You can build it "
+                    "step by step, or try: aspirin, glucose, acetic acid.")
+            else:
+                success, message = builder.load_molecule(smiles)
+        elif action == "add_atom":
             success, message = builder.add_atom(command["symbol"], command["bond_order"], command.get("to_atom"))
         elif action == "add_chain":
             success, message = builder.add_chain(command["count"], to_atom=command.get("to_atom"))
