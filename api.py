@@ -69,6 +69,15 @@ def create_app() -> Flask:
             return ("", 204)  # Empty molecule: nothing to draw.
         return Response(svg, mimetype="image/svg+xml")
 
+    @app.route("/structure3d", methods=["GET"])
+    def structure3d():
+        # A 3D MolBlock for the browser to render and spin. 204 when the
+        # molecule is empty or 3D coordinates could not be generated.
+        block = _engine.structure_3d()
+        if block is None:
+            return ("", 204)
+        return Response(block, mimetype="chemical/x-mdl-molfile")
+
     return app
 
 def reset_state() -> None:

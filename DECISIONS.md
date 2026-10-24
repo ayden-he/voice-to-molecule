@@ -605,3 +605,31 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   carbon/oxygen, using `ELEMENT_NAMES` as the allowed set. Structures remain
   fixed curated SMILES validated by RDKit. Python 3.9.6 validation:
   `python3 -m pytest -q` reports **746 passed**.
+
+## Computed 3D structure endpoint
+
+- Added `/structure3d` and `CommandEngine.structure_3d()` to return an
+  RDKit-generated 3D MolBlock for the web app to render and spin. RDKit adds
+  explicit hydrogens, embeds a conformer with a fixed seed, and attempts MMFF
+  optimization. This is a computed conformer with no stereochemistry modeled,
+  not experimental coordinates; it is a sighted-teacher/demo feature. Empty
+  molecules or failed embedding return a graceful HTTP 204.
+- Validation: all four new endpoint tests pass. The full Python 3.9.6 suite
+  reports **777 passed, 1 failed** outside the sandbox (needed for the existing
+  local HTTP server test). The unrelated Gemini rate-limit test fails with
+  `KeyError: 'file'` when `interpreter.http_diagnostic` reads a mocked HTTPError
+  without a response body. No interpreter or conversation code was changed.
+
+## 3D endpoint and Python 3.9 diagnostic fix
+
+- Confirmed the added `/structure3d` endpoint and `CommandEngine.structure_3d`
+  return an RDKit-generated 3D MolBlock for web rendering and spinning: a
+  computed conformer with no stereochemistry modeled, graceful 204 on empty or
+  failed embedding, and intended as a sighted-teacher/demo feature. Retained
+  the existing implementation and four tests without duplicating them.
+- Fixed the Python 3.9 crash in `interpreter.http_diagnostic`: reading a
+  bodyless HTTPError (such as Gemini 429 rate-limit with `fp=None`) could raise
+  an uncaught KeyError. The diagnostic helper now catches all ordinary
+  exceptions and returns a plain fallback string so diagnostic error handling
+  cannot crash the request. Full Python 3.9.6 suite: **778 passed**, with local
+  HTTP test-server access enabled.
