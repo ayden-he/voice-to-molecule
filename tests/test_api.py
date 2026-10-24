@@ -135,3 +135,31 @@ def test_skip_is_acknowledged_over_api(client):
     assert data["ok"] is True
     assert data["message"] == "Stopped."
     assert data["smiles"] == "C"            # unchanged
+
+def test_name_command_over_api(client, monkeypatch):
+    import naming
+    from unittest.mock import Mock
+    monkeypatch.setattr(naming, "lookup_name",
+                        Mock(return_value=("Aspirin", "2-acetyloxybenzoic acid",
+                                           "This molecule is Aspirin. Its systematic name is 2-acetyloxybenzoic acid.")))
+    post(client, "build aspirin")
+    data = post(client, "name").get_json()
+    assert data["ok"] is True
+    assert "Aspirin" in data["message"]
+    assert data["common_name"] == "Aspirin"
+    assert data["iupac_name"] == "2-acetyloxybenzoic acid"
+    assert data["smiles"] != ""
+
+def test_name_command_network_failure_over_api(client, monkeypatch):
+    import naming
+    from unittest.mock import Mock
+    monkeypatch.setattr(naming, "lookup_name",
+                        Mock(return_value=(None, None,
+                                           "I couldn't reach the naming service. "
+                                           "Check your internet connection and try again.")))
+    post(client, "add carbon")
+    data = post(client, "name").get_json()
+    assert data["ok"] is True
+    assert "couldn't reach" in data["message"]
+    assert data["common_name"] is None
+    assert data["smiles"] == "C"

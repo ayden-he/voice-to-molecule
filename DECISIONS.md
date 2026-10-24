@@ -456,3 +456,17 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   when the reported half-applied state was checked, so no duplicate code or
   tests were added. Left `main.py` and its skip tests untouched.
 - Validation: `python3 -m pytest -q` on Python 3.9.6 reports **647 passed**.
+
+## PubChem molecule names
+
+- Added `name` and its aliases to look up the current molecule by URL-encoded
+  SMILES through PubChem PUG-REST, reporting both the common Title and IUPAC name.
+  This is the program's only network call; chemistry remains with RDKit. The
+  request uses a 10-second timeout and returns plain messages for handled
+  offline/timeout/not-found and malformed-response failures. Molecules without
+  stereochemistry (such as glucose) may receive a generic name like "Hexose".
+- Used the supplied implementation and tests. The socket timeout is not a strict
+  total wall-clock deadline, and the supplied response checks do not cover every
+  malformed field type, so an absolute never-crash/never-hang guarantee is not
+  established. All network access in tests is mocked; the Python 3.9.6 suite
+  reports **668 passed**.

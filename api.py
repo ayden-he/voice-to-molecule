@@ -14,6 +14,7 @@ from rdkit.Chem.Draw import rdMolDraw2D
 
 import export
 import library
+import naming
 from builder import Builder
 from parser import parse
 from readback import detail, summary
@@ -65,6 +66,14 @@ def run_command(text: str) -> Dict[str, Any]:
     if action in ("read_back", "summary"):
         message = detail(_builder) if action == "read_back" else summary(_builder)
         return dict(ok=True, message=message, **_snapshot())
+    if action == "name":
+        if _builder.current_atom is None:
+            return dict(ok=True, message="The molecule is empty.", **_snapshot())
+        common, iupac, message = naming.lookup_name(_builder.smiles())
+        result = dict(ok=True, message=message, **_snapshot())
+        result["common_name"] = common
+        result["iupac_name"] = iupac
+        return result
     if action == "unsupported_element":
         return dict(ok=False, message=ELEMENT_MESSAGE, **_snapshot())
     if action == "help":

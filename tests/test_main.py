@@ -374,3 +374,35 @@ def test_skip_leaves_molecule_unchanged(capsys):
     text_app.handle_line("skip", builder)
     assert builder.smiles() == "C"
     assert builder.current_atom == 1
+
+def test_name_command_speaks_pubchem_result(capsys, monkeypatch):
+    from unittest.mock import Mock
+    monkeypatch.setattr(text_app.naming, "lookup_name",
+                        Mock(return_value=("Aspirin", "2-acetyloxybenzoic acid",
+                                           "This molecule is Aspirin. Its systematic name is 2-acetyloxybenzoic acid.")))
+    builder = Builder()
+    builder.add_atom("C")
+    assert text_app.handle_line("name", builder) is True
+    out = capsys.readouterr().out
+    assert "Aspirin" in out and "2-acetyloxybenzoic acid" in out
+    text_app.naming.lookup_name.assert_called_once()
+
+def test_name_command_handles_network_failure(capsys, monkeypatch):
+    from unittest.mock import Mock
+    monkeypatch.setattr(text_app.naming, "lookup_name",
+                        Mock(return_value=(None, None,
+                                           "I couldn't reach the naming service. "
+                                           "Check your internet connection and try again.")))
+    builder = Builder()
+    builder.add_atom("C")
+    assert text_app.handle_line("name", builder) is True
+    assert "couldn't reach the naming service" in capsys.readouterr().out
+
+def test_name_command_empty_molecule_skips_lookup(capsys, monkeypatch):
+    from unittest.mock import Mock
+    lookup = Mock()
+    monkeypatch.setattr(text_app.naming, "lookup_name", lookup)
+    builder = Builder()
+    assert text_app.handle_line("name", builder) is True
+    assert "empty" in capsys.readouterr().out
+    lookup.assert_not_called()

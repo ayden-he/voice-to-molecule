@@ -158,3 +158,9 @@ def test_chain_and_ring_targets(phrase, expected):
                                      "shush", "SKIP!", "  please stop  "])
 def test_skip_variants_parse_to_skip(phrase):
     assert parse(phrase) == {"action": "skip"}
+
+@pytest.mark.parametrize("phrase", ["name", "name it", "what is this",
+                                     "what am I building", "what did I make",
+                                     "NAME!", "  what is this?  "])
+def test_name_variants_parse_to_name(phrase):
+    assert parse(phrase) == {"action": "name"}

@@ -5,6 +5,7 @@ from typing import List, Optional
 
 import export
 import library
+import naming
 import speech
 from builder import Builder
 from parser import parse
@@ -68,6 +69,14 @@ def handle_line(text: str, builder: Builder) -> bool:
         return True
     if action in ("read_back", "summary"):
         _report(detail(builder) if action == "read_back" else summary(builder))
+        return True
+    if action == "name":
+        if builder.current_atom is None:
+            _report("The molecule is empty.")
+        else:
+            _report("Looking up the name...")
+            _, _, message = naming.lookup_name(builder.smiles())
+            _report(message)
         return True
     if action == "unsupported_element":
         _report(ELEMENT_MESSAGE)

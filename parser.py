@@ -63,6 +63,8 @@ _SIMPLE_COMMANDS = {
     "what can i add": "what_can_i_add", "close the ring": "close_ring",
     "skip": "skip", "stop": "skip", "stop talking": "skip",
     "be quiet": "skip", "shush": "skip",
+    "name": "name", "name it": "name", "what is this": "name",
+    "what am i building": "name", "what did i make": "name",
 }
 
 
