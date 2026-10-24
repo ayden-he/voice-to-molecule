@@ -76,8 +76,20 @@ class Builder:
             candidate.GetBondBetweenAtoms(a - 1, b - 1).SetBondType(self._BONDS[order])
         else:
             candidate.AddBond(a - 1, b - 1, self._BONDS[order])
-        return self._commit(candidate, self._current_atom,
-                            "Changed the bond." if replace else "Connected the atoms.")
+        # Changing a bond inside an aromatic ring (e.g. benzene) is a no-op:
+        # RDKit re-perceives aromaticity and restores the original bonds. Reject
+        # it with a clear message instead of claiming a change that did not
+        # happen, which a non-visual user could not otherwise detect.
+        if replace:
+            before = Chem.MolToSmiles(self._mol)
+            committed, message = self._commit(candidate, self._current_atom,
+                                              "Changed the bond.")
+            if committed and Chem.MolToSmiles(self._mol) == before:
+                self._mol, self._current_atom = self._history.pop()
+                return False, ("That bond is part of an aromatic ring and cannot "
+                               "be changed on its own. The molecule has not changed.")
+            return committed, message
+        return self._commit(candidate, self._current_atom, "Connected the atoms.")
 
     def connect(self, a, b, bond_order=1):
         """Connect two existing atoms without moving the cursor."""

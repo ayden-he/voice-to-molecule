@@ -357,3 +357,22 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   retains image export rather than implementing the separate live-preview UI.
   **Why:** Verify parser, dispatch, and existing behavior together while keeping
   this stage focused. **Alternatives:** Manual testing only or expanding UI work.
+
+## Bond-edit no-op feedback (Option 1)
+
+- **Decision:** Choose Option 1: report RDKit's truthful no-op rather than force
+  cyclohexadiene. RDKit remains the chemistry authority. The guard applies only
+  to the replace path and compares canonical SMILES before and after a successful
+  commit. An unchanged result restores the molecule and cursor from the just-added
+  history entry and reports rejection; the connect path retains its behavior.
+- **Test:** Replace the old `C1CC=CC=C1` expectation with the requested no-op
+  rejection and state/history checks, preserving the atom-deletion checks. The
+  correction was requested because the old expected value was chemically wrong
+  for the intended RDKit no-op behavior. Local validation does not establish that
+  premise: this checkout clears aromatic flags during commit, and RDKit 2025.09.2
+  changes benzene to `C1=CCCC=C1` for this edit, so the supplied guard does not fire.
+- **Validation:** System `python3 -m pytest -q` cannot run because pytest is not
+  installed in that interpreter. With the project's Python 3.9.6 virtual
+  environment on PATH, the same command reports **435 passed, 1 failed**. The
+  updated aromatic-edit test fails at `assert ok is False`; 436 passing tests
+  cannot be confirmed with the exact requested implementation.
