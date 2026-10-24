@@ -5,8 +5,10 @@ Use Python 3.9.6-compatible syntax: no `X | Y` type unions and no `match`
 statements.
 
 Hard rules:
-- ALL chemistry uses RDKit. No LLM or AI model is used for chemistry or for
-  parsing commands. Parsing uses plain pattern matching.
+- ALL chemistry uses RDKit. Gemini interprets natural language into the existing
+  command vocabulary; deterministic pattern matching validates those commands
+  before Builder executes them. The model never edits molecular state directly.
+  This replaces the original no-AI-parsing rule by explicit user decision.
 - Goal: let the user build complex organic molecules using carbon, oxygen,
   and the halogens fluorine, chlorine, bromine, and iodine, with implicit H.
 - Elements: the user places carbon, oxygen, fluorine, chlorine, bromine, and
@@ -55,7 +57,7 @@ Commands:
 - Existing commands remain available: undo; read it back; summary; save; show;
   faster; slower; quit.
 
-Numbers: accept digits or number words from one through thirty (1–30) wherever
+Numbers: accept digits or number words from one through thirty (1â€“30) wherever
 commands take numbers, including atom references and chain lengths. Reject
 invalid or out-of-range numbers with clear feedback. Chemistry and existing-atom
 validation still apply. Read-only commands do not change molecule state.

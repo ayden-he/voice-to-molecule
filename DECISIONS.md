@@ -1,5 +1,118 @@
 # Decisions
 
+## Merge main into the Gemini voice branch
+
+- Preserve the explicitly approved AI interpretation route and main's expanded
+  element support when resolving SPEC.md. Pull supported element names from
+  Builder into the AI instructions instead of retaining the C/O-only prompt.
+- Extract main's pure command dispatcher and numbered SVG drawing into
+  `CommandEngine`. Flask API and Conversation both use it. Named library loads,
+  halogen edits, name lookups, and undo now have the same behavior in both.
+  The voice server exposes canonical `/command` alongside AI `/utterance`;
+  both endpoints share one engine, lock, molecule, and undo history. Separate
+  server processes remain separate sessions, so the frontend must target one.
+- Direct edits while a voice plan is held require fresh clarification, since
+  the molecule context changed. Keep the requested Stop microphone semantics;
+  handle Skip locally to stop feedback without disabling command mode or
+  consuming an API call. AI-interpreted Skip returns a speech-action marker.
+- Preserve the platform-independent viewer integration test fix. Its old
+  subprocess mock was a test bug, not a missing Windows viewer implementation.
+- **Validation:** 774 Python tests passed, including mixed canonical/AI endpoint
+  history, halogenated library loads, name lookup, Skip, and changed-context
+  barriers. All 34 mocked JavaScript checks passed in V8. Python 3.9 syntax and
+  diff whitespace checks pass. No live Gemini quota was consumed during merge
+  verification; post-merge microphone/AI smoke testing remains manual.
+
+## Gemini error diagnostics
+
+- Generic HTTP failure feedback hid the cause of a live request rejection.
+  Include the HTTP status and Google's error message, redacting the configured
+  key and recognizable Google API keys. Do not display headers or request URLs.
+  Mock tests cover invalid-key redaction and non-JSON service failures. The
+  actual rejection cause requires the updated server's next error response;
+  no credential or speculative API calls are needed to implement diagnostics.
+
+## Switch to Gemini 3.5 Flash-Lite
+
+- **User choice:** Replace OpenAI with `gemini-3.5-flash-lite`, using the user's
+  reported free project quota of 15 RPM, 250K TPM, 500 RPD. These are not
+  guaranteed global limits. Prior OpenAI notes below describe earlier work.
+- **Integration:** Standard-library HTTPS generateContent call, server-only
+  `GEMINI_API_KEY`, optional `GEMINI_MODEL`, JSON Schema response configuration.
+  Preserve existing command validation, RDKit authority, ordering, clarification
+  barriers, and individual undo. No OpenAI runtime dependency remains.
+- **Failures:** Only a complete STOP candidate with a valid command plan can
+  execute. Ignore thought parts. Quota/access/model errors return plain feedback
+  and hold the request, without retrying or exposing the key. Mock tests consume
+  no API quota. Live interpretation still requires a locally configured key.
+- **Sources:** https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite
+  and https://ai.google.dev/api/generate-content
+- **Validation:** Full suite: 459 passed, one pre-existing Windows
+  `test_show_command` failure; `git diff --check` passed. No real Gemini requests
+  were sent because GEMINI_API_KEY is not configured in this environment.
+
+## Natural language interpretation and continuous command mode
+
+- **User-authorized change:** Replace regex-only language interpretation with
+  OpenAI natural language interpretation. Chrome still transcribes speech;
+  OpenAI returns a constrained ordered plan of canonical commands and questions.
+  The existing parser validates commands and RDKit validates edits. No AI model
+  changes molecular state directly. SPEC.md reflects this revised requirement.
+- **Controls:** Enable once, Start, Pause, Stop. Pause ignores commands including
+  Undo; Stop turns off the microphone and discards unfinished speech, retaining
+  submitted work. Undo interrupts spoken feedback immediately while preserving
+  execution order. Multi-action sentences execute as individual undoable commands.
+- **Dependencies:** Execute only the clear prefix. Hold at the first ambiguity
+  or failed edit, announce later queued instructions, and resolve the blocked
+  step before reinterpreting dependent instructions against updated state.
+- **Recognition boundary:** Use finalized browser recognition segments, not
+  interim text that the recognizer can revise. This trades speculative
+  word-by-word edits for predictable command execution. Continuous Chrome
+  recognition is restarted after ordinary end events, with explicit failures
+  leaving typed input available. Headphones are recommended for TTS echo.
+- **OpenAI:** Server-only environment key, Responses API strict JSON Schema,
+  store=false, bounded request timeout, no automatic mutation retries.
+  `OPENAI_MODEL` is configurable; default gpt-4o-mini is an initial choice,
+  not a measured latency or accuracy winner. No API key is configured here;
+  live API accuracy and acoustic/manual accessibility tests remain outstanding.
+  Reference: https://developers.openai.com/api/docs/guides/structured-outputs
+- **Local app:** A standard-library HTTP server on port 8001 serves the new app,
+  NDJSON per-action states, and RDKit SVG. The port-8000 fake-service demo and
+  terminal app remain separate. Tests inject interpreters and HTTP transport.
+
+## Browser speech error diagnostics and hint fallback
+
+- An immediate Chrome recognition failure exposed a generic message that hid
+  the browser error. Show the exact error code for diagnosis. A
+  `phrases-not-supported` event disables optional phrase hints for subsequent
+  attempts; the user starts the next capture explicitly. Detecting the property
+  alone does not guarantee the active speech service supports contextual biasing.
+- Mocked coverage verifies hints are omitted on retry and unknown errors remain
+  visible. Real microphone verification remains a manual check.
+
+## Role 2: Browser speech input
+
+- **Decision:** Use browser Web Speech API, chosen by the user, rather than
+  server-side Whisper. Keep speech text unchanged and chemistry in `/command`.
+  This avoids Python microphone/model dependencies for the browser demo.
+- **Behavior:** One utterance per button activation; cancel, silence, permission
+  denial, unsupported browsers, and service failures retain typed input. Stop
+  TTS before listening; speak backend feedback after recognition ends. Provide
+  a microphone-only mode that never submits commands.
+- **Vocabulary:** Use optional contextual phrase biasing when available.
+  Deprecated grammar lists no longer affect recognition, so they are not used.
+  Reference: https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition/grammars
+- **Integration:** A reusable module and isolated fake-service demo let the
+  frontend owner integrate without a backend dependency. Audio may be handled
+  remotely by the browser provider; this is disclosed in the demo.
+- **Validation limits:** Real microphone accuracy and an eyes-closed molecule
+  build require manual Chrome testing and the forthcoming HTTP backend.
+  Baseline on Windows: 443 passed, one existing `test_show_command` failure
+  because it expects a subprocess viewer rather than Windows `os.startfile`.
+- **Checks:** 19 mocked JavaScript checks passed in the available V8 runtime
+  (Node is not installed here). The Python suite remains 443 passed with the
+  same pre-existing Windows viewer failure; `git diff --check` passes.
+
 ## Stage 1: Project setup
 
 - **What:** Use a project-local `.venv` and `python -m pip` / `python -m pytest`.

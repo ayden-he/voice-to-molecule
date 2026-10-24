@@ -7,6 +7,15 @@ in the Python backend; you only call it and display results.
 
 ## 1. How to run the backend locally
 
+For the combined Gemini voice app, run `python voice_server.py` and use
+`http://127.0.0.1:8001` for both canonical `/command` requests and streamed
+AI `/utterance` requests. Open `/` on that server for the supplied voice page.
+See README.md for the server-only API key setup. The alternative deterministic
+Flask server runs with `python api.py` on port 5000. Choose one server/session;
+the two processes do not share molecules. Both use `command_engine.py`.
+The combined voice server expects same-origin requests; host its frontend on
+that server. The cross-origin development support below applies to Flask.
+
 Leave that running in one terminal. Your web page calls it. The server keeps ONE
 molecule for its lifetime (single-user, fine for the demo). Restart the server
 to start a fresh molecule, or send the command "start over".

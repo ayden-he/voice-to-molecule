@@ -177,7 +177,7 @@ def test_image_refresh_and_empty_cleanup(capsys):
 def test_show_command(monkeypatch, capsys):
     from unittest.mock import Mock
     opener = Mock()
-    monkeypatch.setattr(text_app.export.subprocess, "run", opener)
+    monkeypatch.setattr(text_app.export, "_open_file", opener)
     builder = Builder()
     text_app.handle_line("show", builder)
     opener.assert_not_called()

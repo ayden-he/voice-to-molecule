@@ -9,17 +9,94 @@ voice (Person 2) code against them — and can build against a mock that returns
 canned versions of these shapes until the real backend is ready.
 
 ## Principle (do not break)
-The AI never does chemistry. Voice/browser turns speech into text; that text is
-sent to /command; the Python backend runs the deterministic parser + RDKit and
-returns the result. Chemistry lives only in the backend.
+RDKit remains the chemistry authority. Chrome transcribes speech; Gemini maps
+natural language to the existing command vocabulary. The deterministic parser
+checks that vocabulary and Builder validates each edit. This AI interpretation
+route replaces the original regex-only language interpretation by user request.
 
 ## Base
 - Local dev server, e.g. http://127.0.0.1:5000
-- All request and response bodies are JSON.
+- Requests are JSON. Responses are JSON except `/utterance` (NDJSON) and images.
 - One molecule-building session per server process is fine for the hackathon
   (a single shared Builder). Multi-user sessions are out of scope.
 
+## Voice decision: browser Web Speech API
+
+### Continuous AI app (current implementation)
+
+Run `voice_server.py` on localhost port 8001 and open `/`. The API key exists
+only in the server environment (`GEMINI_API_KEY`). `GEMINI_MODEL` optionally
+overrides the default `gemini-3.5-flash-lite`. No Python SDK dependency is required.
+The interpreter uses Gemini generateContent with JSON Schema output and sends
+the key in the `x-goog-api-key` header, never the browser or URL. Non-STOP,
+blocked, malformed, and invalid-command responses execute no steps. Quota
+errors retain the request for clarification/retry without automatic API retries.
+
+`POST /utterance` accepts `{ "text": "add a carbon then an oxygen" }`.
+It returns `application/x-ndjson`: one complete state event per executed action
+or clarification barrier, each with `ok`, `message`, `queued`, `version`, and
+the ordinary molecule state fields. GET `/state` returns the latest snapshot;
+GET `/image` returns numbered SVG. Requests are serialized client-side and
+server-side. Each successful mutation has one Builder undo step. A browser
+disconnect does not cancel an already accepted request.
+The combined voice server also provides `/command`, sharing this exact engine
+and undo stack. Direct edits hold pending voice plans for clarification because
+their context changed. `command_engine.py` supplies the dispatcher to both this
+server and Flask `api.py`. Separate server processes have separate sessions;
+configure the frontend to use one selected server for all molecule requests.
+The voice server serves SVG; Flask also supports PNG as described below.
+
+Enable microphone starts paused. Start enables commands; Pause disables
+commands including Undo while retaining recognition; Stop aborts recognition
+and discards unfinished speech. A button is required to enable the mic again.
+Control words are separate utterances and handled locally. Undo interrupts TTS
+immediately and executes after earlier submitted requests finish. Already
+submitted work runs even after Pause/Stop. Recognition uses finalized segments,
+not revisable interim transcripts. Updates occur per action after a segment
+is finalized and interpreted; this is not word-by-word speculative execution.
+Skip (also "stop talking", "be quiet", "shush") stops feedback while command
+mode remains active, without an AI request. Stop still turns off the microphone.
+Skip is ignored while paused, consistently with other non-control commands.
+
+Clear steps before the first ambiguity execute; the ambiguous step and all
+following instructions are held. The question explicitly announces queued
+instructions. A clarification resolves the first blocked request, then retained
+instructions are reinterpreted against the updated state and run in order.
+RDKit rejections also block dependent steps. Interpretation failures preserve
+the original request without mutating the molecule. Network failures are not
+automatically retried, to avoid duplicating an edit after a lost response.
+
+Use headphones during continuous listening to avoid TTS entering the mic.
+Microphone permissions, browser recognition restarts, acoustic feedback, and
+real Gemini interpretation still require manual end-to-end validation.
+
+### Isolated microphone demo (earlier implementation)
+
+Role 2 uses browser `SpeechRecognition` / `webkitSpeechRecognition`, one
+user-triggered utterance at a time. No Whisper dependencies or `/transcribe`
+endpoint are needed. `web/voice.mjs` exposes `createVoice` and `postCommand`.
+Only one nonempty final transcript is forwarded, unchanged; interim results,
+silence, errors, and cancelled captures never submit commands. The microphone
+test returns text with `{test: true}` and must never call `/command`.
+
+Frontend integration: pass `onText(text, {test})`, `onStatus(message)`, and
+`onBusy(boolean)` callbacks. Queue command transcripts until `onBusy(false)`
+before sending and speaking feedback. Stop browser speech before capture;
+if another speech engine is used, supply a `stopSpeaking` callback that also
+stops it. Keep typed input available and serialize command requests.
+`postCommand(text)` sends the existing JSON contract to the same origin.
+The demo uses an explicit fake service; it does not implement chemistry.
+
+Serve on localhost or HTTPS. Chrome is the initial demo target; detect support
+at runtime. Browser speech may use a remote provider and need internet access.
+Optional `SpeechRecognitionPhrase` hints are used where supported; deprecated
+grammars have no recognition effect. No local-only processing is promised.
+
 ## POST /command
+
+Implemented by both Flask `api.py` and the combined `voice_server.py`. The
+continuous app uses `/utterance` for language interpretation and this same
+dispatcher for its resulting canonical commands.
 Run one command (the same strings the terminal app accepts, e.g. "add carbon",
 "add oxygen double bond to atom two", "read it back").
 
