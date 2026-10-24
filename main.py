@@ -15,17 +15,24 @@ OPTIONS_TEXT = """Elements: carbon and oxygen. Hydrogens are added automatically
 Groups: methyl, ethyl, hydroxyl, methoxy, aldehyde, carboxylic acid.
 Rings: cyclopropane, cyclobutane, cyclopentane, cyclohexane, benzene."""
 
-HELP_TEXT = """Commands (numbers: digits or words one through thirty):
-Build: add carbon; add oxygen double bond; add five carbons.
-Groups: add methyl; add ethyl; add hydroxyl; add methoxy; add aldehyde;
-  add carboxylic acid. Build commands can end with: to atom N.
-Rings: add cyclopropane; add cyclobutane; add cyclopentane; add cyclohexane;
-  add benzene ring; bond atom six to atom one; close the ring.
-Edit: change the bond between two and three to double (or single, triple);
-  delete atom five; start over; undo.
-Navigate: go to atom N; where am I; what can I add.
-Read: read it back (also: read back, describe); summary.
-Other: show; save (not built yet); faster; slower; help; quit."""
+HELP_TEXT = """You build molecules from carbon and oxygen. Hydrogens are added
+for you, and each new atom attaches to your current atom.
+To add an atom, say "add carbon" or "add oxygen".
+To add a double or triple bond, say it in the command, like "add oxygen double bond".
+To attach to a specific atom, end with its number, like "add carbon to atom two".
+To add several atoms at once, say "add five carbons".
+To add a group, name it, like "add methyl". Say "what can I add" for the full list of groups.
+To add a ring, name it, like "add benzene ring". Say "what can I add" for the full list of rings.
+To build a known molecule, say "build" and its name, like "build aspirin".
+To connect two atoms into a ring, say "bond atom six to atom one".
+To change a bond, say "change the bond between two and three to double".
+To move to another atom, say "go to atom two".
+To remove an atom, say "delete atom five".
+To undo your last step, say "undo". To clear everything, say "start over".
+To hear your molecule, say "read it back" for the full details, or "summary" for the totals.
+To check where you are, say "where am I".
+To change the voice, say "faster" or "slower". To stop the voice, say "skip".
+To finish, say "quit"."""
 
 ELEMENT_MESSAGE = ("Only carbon and oxygen can be added. "
                    "Hydrogens are added automatically.")
@@ -49,6 +56,12 @@ def handle_line(text: str, builder: Builder) -> bool:
     if action == "quit":
         speech.stop_speaking()
         return False
+    if action == "skip":
+        # Stop the current readback. Print only (do not speak) so this command
+        # produces silence rather than more speech to interrupt.
+        speech.stop_speaking()
+        print("Stopped.")
+        return True
     if action in ("faster", "slower"):
         rate = speech.set_rate(speech.RATE + (40 if action == "faster" else -40))
         _report("Speech rate is now {} words per minute.".format(rate))

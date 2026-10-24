@@ -431,3 +431,18 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   ambiguous: it counted only user-placed carbon/oxygen, not implicit hydrogens.
   Summary now reports composition and hydrogen count only; `detail()` is
   unchanged. Updated only the six corresponding summary expectations.
+
+## Skip spoken output
+
+- Added `skip` (aliases `stop`, `shush`, `be quiet`, and `stop talking`) to
+  silence a long readback using the existing `speech.stop_speaking()`. It prints
+  "Stopped." without speaking, avoiding a new utterance after interruption.
+  The API acknowledges the command because the browser owns playback there.
+  Chemistry and molecule state are unchanged.
+
+## How-to help text
+
+- Rewrote help to a how-to-with-one-example style: each line shows how to do
+  one kind of action. Full group/ring lists are deferred to "what can I add".
+  Dropped the unimplemented "save" and redundant "help" entries from the help
+  text. Command logic is unchanged; updated the two help-content tests.

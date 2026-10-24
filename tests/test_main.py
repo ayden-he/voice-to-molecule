@@ -57,8 +57,11 @@ def test_help_unknown_and_quit(capsys):
     builder = Builder()
     assert text_app.handle_line("help", builder) is True
     output = capsys.readouterr().out
+    # Help teaches how to do each kind of thing with one example each. It no
+    # longer advertises the unimplemented "save" placeholder or a redundant
+    # "help" entry.
     for command in ("add carbon", "add oxygen", "go to atom", "undo",
-                    "read it back", "summary", "save", "help", "quit"):
+                    "read it back", "summary", "quit"):
         assert command in output
     assert "SMILES: empty" in output
     assert text_app.handle_line("nonsense", builder) is True
@@ -256,8 +259,11 @@ def test_navigation_options_and_grouped_help_are_read_only(capsys, monkeypatch):
     text_app.speech.speak.assert_called_with(text_app.OPTIONS_TEXT)
     text_app.handle_line("help", builder)
     output = capsys.readouterr().out
-    for label in ("Build:", "Groups:", "Rings:", "Edit:", "Navigate:", "Read:", "Other:"):
-        assert label in output
+    # Help covers each kind of action with a worked example, and points to
+    # "what can I add" for the full group/ring lists.
+    for phrase in ("add carbon", "add oxygen double bond", "add methyl",
+                   "add benzene ring", "what can I add", "undo", "read it back"):
+        assert phrase in output
     save.assert_not_called()
     builder.undo()
     assert builder.current_atom is None
@@ -351,3 +357,20 @@ def test_named_molecule_is_undoable(capsys):
     assert Chem.CanonSmiles(builder.smiles()) == Chem.CanonSmiles("c1ccccc1")
     builder.undo()
     assert builder.smiles() == ""
+
+def test_skip_stops_speech_without_speaking(capsys):
+    builder = Builder()
+    text_app.speech.stop_speaking.reset_mock()
+    text_app.speech.speak.reset_mock()
+    assert text_app.handle_line("skip", builder) is True
+    text_app.speech.stop_speaking.assert_called_once()
+    text_app.speech.speak.assert_not_called()
+    assert capsys.readouterr().out == "Stopped.\n"
+    assert "SMILES:" not in capsys.readouterr().out
+
+def test_skip_leaves_molecule_unchanged(capsys):
+    builder = Builder()
+    builder.add_atom("C")
+    text_app.handle_line("skip", builder)
+    assert builder.smiles() == "C"
+    assert builder.current_atom == 1
