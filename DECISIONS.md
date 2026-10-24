@@ -483,3 +483,12 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
 - Nitrogen and other elements remain rejected. Chose halogens because fixed
   valence 1 makes them chemically simple additions while keeping the C/O/H
   guardrail intact for everything else. Updated SPEC scope and terminal tests.
+
+## Halogenated library molecules
+
+- Added 20 common halogenated molecules (halomethanes, haloethanes/alkenes,
+  halobenzenes, and chloro/trifluoroacetic acid) with common aliases. Updated
+  the library element-scope test to allow supported halogens instead of only
+  carbon/oxygen, using `ELEMENT_NAMES` as the allowed set. Structures remain
+  fixed curated SMILES validated by RDKit. Python 3.9.6 validation:
+  `python3 -m pytest -q` reports **746 passed**.

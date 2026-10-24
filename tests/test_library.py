@@ -16,10 +16,13 @@ def test_every_entry_loads_and_matches(name):
     assert Chem.CanonSmiles(builder.smiles()) == Chem.CanonSmiles(smiles)
 
 @pytest.mark.parametrize("name", library.names())
-def test_every_entry_is_carbon_oxygen_hydrogen_only(name):
+def test_every_entry_is_a_supported_element_only(name):
+    # Every library structure must contain only elements the tool supports
+    # (carbon, oxygen, and the halogens); hydrogens are implicit.
+    from builder import ELEMENT_NAMES
     molecule = Chem.MolFromSmiles(library.lookup(name))
     assert molecule is not None
-    assert all(a.GetSymbol() in ("C", "O") for a in molecule.GetAtoms())
+    assert all(a.GetSymbol() in ELEMENT_NAMES for a in molecule.GetAtoms())
 
 @pytest.mark.parametrize("spelling", [
     "aspirin", "Aspirin", "  ASPIRIN  ", "acetylsalicylic acid",

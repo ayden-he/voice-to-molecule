@@ -68,6 +68,33 @@ _LIBRARY: Dict[str, str] = {
     "ribose": "OCC1OC(O)C(O)C1O",
     # Terpene alcohol (connectivity only; no stereochemistry)
     "menthol": "CC(C)C1CCC(C)CC1O",
+    # Halomethanes
+    "chloromethane": "CCl", "methyl chloride": "CCl",
+    "dichloromethane": "C(Cl)Cl", "dcm": "C(Cl)Cl",
+    "methylene chloride": "C(Cl)Cl",
+    "chloroform": "C(Cl)(Cl)Cl", "trichloromethane": "C(Cl)(Cl)Cl",
+    "carbon tetrachloride": "C(Cl)(Cl)(Cl)Cl",
+    "tetrachloromethane": "C(Cl)(Cl)(Cl)Cl",
+    "bromomethane": "CBr", "methyl bromide": "CBr",
+    "iodomethane": "CI", "methyl iodide": "CI",
+    "fluoromethane": "CF", "methyl fluoride": "CF",
+    "tetrafluoromethane": "FC(F)(F)F", "carbon tetrafluoride": "FC(F)(F)F",
+    # Haloethanes and halo-alkenes
+    "chloroethane": "CCCl", "ethyl chloride": "CCCl",
+    "vinyl chloride": "C=CCl", "chloroethene": "C=CCl",
+    "trichloroethylene": "ClC=C(Cl)Cl", "tce": "ClC=C(Cl)Cl",
+    "perchloroethylene": "ClC(Cl)=C(Cl)Cl",
+    "tetrachloroethylene": "ClC(Cl)=C(Cl)Cl", "perc": "ClC(Cl)=C(Cl)Cl",
+    "hexachloroethane": "ClC(Cl)(Cl)C(Cl)(Cl)Cl",
+    "freon-12": "FC(F)(Cl)Cl", "dichlorodifluoromethane": "FC(F)(Cl)Cl",
+    # Halogenated aromatics
+    "chlorobenzene": "Clc1ccccc1",
+    "bromobenzene": "Brc1ccccc1",
+    "fluorobenzene": "Fc1ccccc1",
+    "iodobenzene": "Ic1ccccc1",
+    # Halogenated acids
+    "chloroacetic acid": "OC(=O)CCl",
+    "trifluoroacetic acid": "OC(=O)C(F)(F)F", "tfa": "OC(=O)C(F)(F)F",
 }
 
 # Precompute a punctuation-insensitive index so "propan-2-ol", "propan 2 ol",
