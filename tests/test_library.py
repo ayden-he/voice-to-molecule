@@ -37,12 +37,19 @@ def test_punctuation_insensitive_lookup(spelling):
 def test_unknown_names_return_none_never_guess(name):
     assert library.lookup(name) is None
 
-def test_load_molecule_rejects_non_co_elements():
+def test_load_molecule_rejects_unsupported_elements():
+    from builder import UNSUPPORTED_ELEMENT_MESSAGE
     builder = Builder()
-    ok, message = builder.load_molecule("CCN")        # has nitrogen
+    ok, message = builder.load_molecule("CCN")        # nitrogen: still unsupported
     assert ok is False
-    assert "carbon and oxygen" in message
+    assert message == UNSUPPORTED_ELEMENT_MESSAGE
     assert builder.smiles() == ""                      # unchanged
+
+def test_load_molecule_accepts_halogen():
+    builder = Builder()
+    ok, message = builder.load_molecule("CCl")        # chloromethane: now supported
+    assert ok is True
+    assert builder.smiles() == "CCl"
 
 @pytest.mark.parametrize("bad", ["", "not a smiles", "C(C", None, 5])
 def test_load_molecule_handles_bad_input(bad):

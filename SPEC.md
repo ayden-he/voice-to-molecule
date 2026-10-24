@@ -7,10 +7,13 @@ statements.
 Hard rules:
 - ALL chemistry uses RDKit. No LLM or AI model is used for chemistry or for
   parsing commands. Parsing uses plain pattern matching.
-- Goal: let the user build complex organic molecules using only C, O, and H.
-- Elements: the user places carbon and oxygen. Hydrogens are implicit and
-  filled in automatically. Max valence: C 4, O 2. Any other element is
-  rejected with a clear message ("Only carbon and oxygen can be added.
+- Goal: let the user build complex organic molecules using carbon, oxygen,
+  and the halogens fluorine, chlorine, bromine, and iodine, with implicit H.
+- Elements: the user places carbon, oxygen, fluorine, chlorine, bromine, and
+  iodine. Hydrogens are implicit and filled in automatically. Max valence:
+  C 4, O 2, halogens 1. Nitrogen, sulfur, phosphorus, and other elements remain
+  out of scope and are rejected with a clear message ("Only carbon, oxygen,
+  and the halogens fluorine, chlorine, bromine, and iodine can be added.
   Hydrogens are added automatically.").
 - Bonds: single, double, triple.
 - Rings: close a ring by bonding any two existing atoms; ring templates
@@ -32,7 +35,7 @@ State and validation rules:
 - A "current atom" cursor exists. New atoms bond to it by default, then become
   current. An explicit target does not require a separate cursor move.
 - Atoms are numbered 1-based in the order added. Readback always uses these.
-- Bond orders and ring closures must respect the C 4 / O 2 valence limits.
+- Bond orders and ring closures must respect the C 4 / O 2 / halogens 1 valence limits.
 - Failed commands return clear, plain-language messages. Nothing should crash.
 - Every state-changing action, including cursor moves, chains, templates,
   shortcuts, deletion, bond changes, and start over, is undoable. Compound
@@ -42,7 +45,8 @@ State and validation rules:
 
 Commands:
 - Add carbon or oxygen with a single, double, or triple bond, subject to
-  valence limits; optionally name a target with "to atom N".
+  valence limits; add fluorine, chlorine, bromine, or iodine with a single
+  bond only; optionally name a target with "to atom N".
 - Add chains, for example "add five carbons", optionally "to atom N".
 - Close a ring between two existing atoms; add ring templates and functional
   group shortcuts, optionally naming an attachment target.

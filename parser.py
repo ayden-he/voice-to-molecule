@@ -19,6 +19,15 @@ for _word, _value in list(_NUMBERS.items()):
 
 _GROUPS = {"methyl", "ethyl", "hydroxyl", "methoxy", "aldehyde", "carboxylic acid"}
 _RINGS = {"cyclopropane", "cyclobutane", "cyclopentane", "cyclohexane", "benzene"}
+# Supported elements the user can place: spoken name -> RDKit symbol. Carbon and
+# oxygen plus the halogens. Hydrogens are always implicit and never placed.
+_ELEMENTS = {
+    "carbon": "C", "oxygen": "O",
+    "fluorine": "F", "chlorine": "Cl", "bromine": "Br", "iodine": "I",
+}
+# Halogens take exactly one single bond, so a double/triple on them is invalid.
+_HALOGENS = {"F", "Cl", "Br", "I"}
+
 # Recognize actual element names for clear rejection; unknown nouns stay unknown.
 _OTHER_ELEMENTS = set("""hydrogen helium lithium beryllium boron nitrogen fluorine
 neon sodium magnesium aluminium aluminum silicon phosphorus sulfur sulphur chlorine
@@ -37,6 +46,10 @@ h he li be b n f ne na mg al si p s cl ar k ca sc ti v cr mn fe co ni cu zn ga g
 se br kr rb sr y zr nb mo tc ru rh pd ag cd in sn sb te i xe cs ba la ce pr nd pm sm
 eu gd tb dy ho er tm yb lu hf ta w re os ir pt au hg tl pb bi po at rn fr ra ac th pa
 u np pu am cm bk cf es fm md no lr rf db sg bh hs mt ds rg cn nh fl mc lv ts og""".split())
+# The halogens are now supported, so drop their names and symbols from the
+# rejection set (leave nitrogen, sulfur, etc. rejected).
+_OTHER_ELEMENTS -= {"fluorine", "chlorine", "bromine", "iodine",
+                    "f", "cl", "br", "i"}
 _ATOM = r"(?:atom|atoms|adam)"
 _NUMBER = r"([a-z]+(?: [a-z]+)?|[0-9]+)"
 _ORDER = r"(single|double|doubled|triple|tripled)"
@@ -114,11 +127,14 @@ def parse(text: str) -> Optional[Dict[str, Any]]:
         order = _ORDERS[bond]
         if element in _OTHER_ELEMENTS:
             return {"action": "unsupported_element"}
-        if element in ("carbon", "oxygen"):
+        if element in _ELEMENTS:
+            symbol = _ELEMENTS[element]
+            # Oxygen cannot take a triple bond; halogens take only a single bond.
             if element == "oxygen" and order == 3:
                 return None
-            result = {"action": "add_atom", "symbol": "C" if element == "carbon" else "O",
-                      "bond_order": order}
+            if symbol in _HALOGENS and order != 1:
+                return None
+            result = {"action": "add_atom", "symbol": symbol, "bond_order": order}
             if target is not None:
                 result["to_atom"] = target
             return result

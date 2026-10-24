@@ -1,9 +1,9 @@
 """Turn public Builder descriptions into text suitable for speaking aloud."""
 
-from builder import Builder
+from builder import Builder, ELEMENT_NAMES
 
 
-_NAMES = {"C": "carbon", "O": "oxygen"}
+_NAMES = ELEMENT_NAMES
 _BONDS = {1: "single bond", 2: "double bond", 3: "triple bond"}
 
 

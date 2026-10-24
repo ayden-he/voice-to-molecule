@@ -7,18 +7,20 @@ import export
 import library
 import naming
 import speech
-from builder import Builder
+from builder import Builder, ELEMENT_NAMES
 from parser import parse
 from readback import detail, summary
 
 
-OPTIONS_TEXT = """Elements: carbon and oxygen. Hydrogens are added automatically.
+OPTIONS_TEXT = """Elements: carbon, oxygen, and the halogens fluorine, chlorine,
+bromine, and iodine. Hydrogens are added automatically.
 Groups: methyl, ethyl, hydroxyl, methoxy, aldehyde, carboxylic acid.
 Rings: cyclopropane, cyclobutane, cyclopentane, cyclohexane, benzene."""
 
-HELP_TEXT = """You build molecules from carbon and oxygen. Hydrogens are added
-for you, and each new atom attaches to your current atom.
-To add an atom, say "add carbon" or "add oxygen".
+HELP_TEXT = """You build molecules from carbon, oxygen, and the halogens
+(fluorine, chlorine, bromine, iodine). Hydrogens are added for you, and each new
+atom attaches to your current atom.
+To add an atom, say "add carbon", "add oxygen", or "add chlorine".
 To add a double or triple bond, say it in the command, like "add oxygen double bond".
 To attach to a specific atom, end with its number, like "add carbon to atom two".
 To add several atoms at once, say "add five carbons".
@@ -35,8 +37,7 @@ To check where you are, say "where am I".
 To change the voice, say "faster" or "slower". To stop the voice, say "skip".
 To finish, say "quit"."""
 
-ELEMENT_MESSAGE = ("Only carbon and oxygen can be added. "
-                   "Hydrogens are added automatically.")
+from builder import UNSUPPORTED_ELEMENT_MESSAGE as ELEMENT_MESSAGE
 
 
 def _report(text: str) -> None:
@@ -86,7 +87,7 @@ def handle_line(text: str, builder: Builder) -> bool:
             _report("The molecule is empty. There is no current atom.")
         else:
             atom = builder.describe_atoms()[builder.current_atom - 1]
-            name = {"C": "carbon", "O": "oxygen"}[atom["symbol"]]
+            name = ELEMENT_NAMES[atom["symbol"]]
             _report("You are at atom {}, {}.".format(builder.current_atom, name))
         return True
     if action == "what_can_i_add":

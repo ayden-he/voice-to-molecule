@@ -124,10 +124,11 @@ def test_unknown_named_molecule_over_api_is_graceful(client):
 def test_named_molecule_rejects_hidden_non_co(client, monkeypatch):
     # Even if the library were tampered with, load_molecule enforces C/O only.
     import library
+    from builder import UNSUPPORTED_ELEMENT_MESSAGE
     monkeypatch.setitem(library._INDEX, "fake", "CCN")
     data = post(client, "build fake").get_json()
     assert data["ok"] is False
-    assert "carbon and oxygen" in data["message"]
+    assert data["message"] == UNSUPPORTED_ELEMENT_MESSAGE
 
 def test_skip_is_acknowledged_over_api(client):
     post(client, "add carbon")

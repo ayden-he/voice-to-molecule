@@ -470,3 +470,16 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   malformed field type, so an absolute never-crash/never-hang guarantee is not
   established. All network access in tests is mocked; the Python 3.9.6 suite
   reports **668 passed**.
+
+## Halogen support
+
+- Added fluorine, chlorine, bromine, and iodine (F, Cl, Br, I), all valence 1
+  and single-bond only, with no charges or aromaticity. Centralized supported
+  element names, valences, and rejection wording in `builder.py` through
+  `ELEMENT_NAMES`, `ELEMENT_VALENCE`, and `UNSUPPORTED_ELEMENT_MESSAGE`.
+  Readback and cursor descriptions use the shared names; help/options and the
+  library structure check reflect the supported set. The parser currently has
+  its own explicit name-to-symbol mapping for the same set.
+- Nitrogen and other elements remain rejected. Chose halogens because fixed
+  valence 1 makes them chemically simple additions while keeping the C/O/H
+  guardrail intact for everything else. Updated SPEC scope and terminal tests.

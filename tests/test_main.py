@@ -225,19 +225,31 @@ def test_extended_command_scripts(commands, expected, capsys):
     assert text_app.export.CURRENT_IMAGE.exists() == bool(expected)
 
 
-@pytest.mark.parametrize("command", ["add nitrogen", "add chlorine", "add N", "add hydrogen",
-    "add sulfur to atom two", "ADD BROMINE DOUBLE-BOND!", "add sodium"])
+@pytest.mark.parametrize("command", ["add nitrogen", "add N", "add hydrogen",
+    "add sulfur to atom two", "add sodium", "add phosphorus"])
 def test_other_element_feedback_is_spoken_and_preserves_state(command, capsys):
     builder = Builder()
     builder.add_atom("C")
     before = builder.smiles(), builder.describe_atoms(), builder.current_atom
     assert text_app.handle_line(command, builder)
-    message = "Only carbon and oxygen can be added. Hydrogens are added automatically."
+    message = text_app.ELEMENT_MESSAGE
     assert capsys.readouterr().out == message + "\n"
     text_app.speech.speak.assert_called_with(message)
     assert (builder.smiles(), builder.describe_atoms(), builder.current_atom) == before
     builder.undo()
     assert builder.smiles() == ""
+
+
+@pytest.mark.parametrize("command, symbol", [
+    ("add chlorine", "Cl"), ("add fluorine to atom one", "F"),
+    ("add bromine", "Br"), ("add iodine", "I"),
+])
+def test_halogens_build_over_the_text_interface(command, symbol, capsys):
+    builder = Builder()
+    builder.add_atom("C")
+    assert text_app.handle_line(command, builder)
+    assert symbol in [a["symbol"] for a in builder.describe_atoms()]
+    assert "SMILES:" in capsys.readouterr().out
 
 
 def test_navigation_options_and_grouped_help_are_read_only(capsys, monkeypatch):

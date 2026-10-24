@@ -15,7 +15,7 @@ from rdkit.Chem.Draw import rdMolDraw2D
 import export
 import library
 import naming
-from builder import Builder
+from builder import Builder, ELEMENT_NAMES
 from parser import parse
 from readback import detail, summary
 
@@ -24,11 +24,11 @@ _builder = Builder()
 # Bumped on every successful change so the browser can cache-bust the image.
 _version = 0
 
-ELEMENT_MESSAGE = ("Only carbon and oxygen can be added. "
-                   "Hydrogens are added automatically.")
+from builder import UNSUPPORTED_ELEMENT_MESSAGE as ELEMENT_MESSAGE
 UNKNOWN_MESSAGE = ("I didn't understand that. "
                    "Try: add carbon; add oxygen double bond; go to atom 3.")
-OPTIONS_TEXT = ("Elements: carbon and oxygen. Hydrogens are added automatically. "
+OPTIONS_TEXT = ("Elements: carbon, oxygen, and the halogens fluorine, chlorine, "
+                "bromine, and iodine. Hydrogens are added automatically. "
                 "Groups: methyl, ethyl, hydroxyl, methoxy, aldehyde, carboxylic acid. "
                 "Rings: cyclopropane, cyclobutane, cyclopentane, cyclohexane, benzene.")
 HELP_TEXT = ("Build: add carbon; add oxygen double bond; add five carbons; "
@@ -85,7 +85,7 @@ def run_command(text: str) -> Dict[str, Any]:
             message = "The molecule is empty. There is no current atom."
         else:
             atom = _builder.describe_atoms()[_builder.current_atom - 1]
-            name = {"C": "carbon", "O": "oxygen"}[atom["symbol"]]
+            name = ELEMENT_NAMES[atom["symbol"]]
             message = "You are at atom {}, {}.".format(_builder.current_atom, name)
         return dict(ok=True, message=message, **_snapshot())
     # "skip" stops speech. Over HTTP the browser owns playback, so just

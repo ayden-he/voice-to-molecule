@@ -105,7 +105,7 @@ def test_undo_empty_molecule():
     assert_rejected(builder, builder.undo)
 
 
-@pytest.mark.parametrize("symbol", ["N", "H", "Cl", "", "carbon"])
+@pytest.mark.parametrize("symbol", ["N", "H", "S", "", "carbon"])
 @pytest.mark.parametrize("populated", [False, True])
 def test_rejects_unsupported_elements(symbol, populated):
     builder = Builder()
@@ -284,10 +284,24 @@ def test_compound_failure_rolls_back_everything(method, args):
     assert len(builder._history) == history_length
 
 
-@pytest.mark.parametrize("symbol", ["N", "S", "F", "Cl", "Br", "I", "H", None, 6])
+@pytest.mark.parametrize("symbol", ["N", "S", "P", "B", "H", None, 6])
 def test_element_rejection_message(symbol):
+    from builder import UNSUPPORTED_ELEMENT_MESSAGE
     builder = Builder()
-    assert builder.add_atom(symbol) == (False, "Only carbon and oxygen can be added. Hydrogens are added automatically.")
+    assert builder.add_atom(symbol) == (False, UNSUPPORTED_ELEMENT_MESSAGE)
+
+@pytest.mark.parametrize("symbol, expected", [
+    ("F", "F"), ("Cl", "Cl"), ("Br", "Br"), ("I", "I"),
+])
+def test_halogens_can_be_added(symbol, expected):
+    # Halogens are valence 1: a carbon with a halogen attached.
+    builder = Builder()
+    assert_success(builder.add_atom("C"))
+    assert_success(builder.add_atom(symbol))
+    assert builder.describe_atoms()[1]["symbol"] == expected
+    # A second bond on the halogen must be rejected (valence 1).
+    assert_success(builder.go_to(2))
+    assert_rejected(builder, builder.add_atom, "C")
 
 
 @pytest.mark.parametrize("cursor, deleted, expected_cursor", [(3, 1, 2), (2, 2, 1), (1, 1, 1), (1, 3, 1)])

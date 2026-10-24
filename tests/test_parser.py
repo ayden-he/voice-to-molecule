@@ -121,11 +121,22 @@ def test_numbers_through_thirty_across_commands(number, word):
         assert parse("change bond between one and " + text + " to single")["b"] == number
 
 
-@pytest.mark.parametrize("name", ["nitrogen", "chlorine", "hydrogen", "sulfur", "fluorine",
-    "bromine", "iodine", "phosphorus", "sodium", "gold", "uranium", "N", "Cl", "H", "Br"])
+@pytest.mark.parametrize("name", ["nitrogen", "hydrogen", "sulfur", "phosphorus",
+    "sodium", "gold", "uranium", "N", "H", "S", "P"])
 def test_unsupported_element_action(name):
     for suffix in ("", " double bond", " to atom twenty two"):
         assert parse("add " + name + suffix) == {"action": "unsupported_element"}
+
+@pytest.mark.parametrize("name, symbol", [
+    ("fluorine", "F"), ("chlorine", "Cl"), ("bromine", "Br"), ("iodine", "I"),
+])
+def test_halogens_parse_as_add_atom(name, symbol):
+    # Halogens are supported, single-bond only.
+    assert parse("add " + name) == {"action": "add_atom", "symbol": symbol, "bond_order": 1}
+    assert parse("add " + name + " single bond") == {"action": "add_atom", "symbol": symbol, "bond_order": 1}
+    assert parse("add " + name + " to atom two") == {"action": "add_atom", "symbol": symbol, "bond_order": 1, "to_atom": 2}
+    assert parse("add " + name + " double bond") is None
+    assert parse("add " + name + " triple bond") is None
 
 
 @pytest.mark.parametrize("kind", ["cyclopropane", "cyclobutane", "cyclopentane", "cyclohexane", "benzene"])
