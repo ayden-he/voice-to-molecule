@@ -7,7 +7,8 @@ See SPEC.md for the project scope and working rules.
 In PowerShell, set your own API key locally (do not commit it or paste it in chat):
 
 ```powershell
-$env:GEMINI_API_KEY = "your-api-key"
+$geminiSecret = Read-Host "Enter Gemini API key" -AsSecureString
+$env:GEMINI_API_KEY = [System.Net.NetworkCredential]::new("", $geminiSecret).Password
 .venv\Scripts\python.exe voice_server.py
 ```
 
@@ -18,6 +19,14 @@ add oxygen". Each action updates the numbered drawing. Say **Undo** to reverse
 the last action, **Pause** to suspend commands, **Start** to resume, and **Stop**
 to turn the microphone off. Undo is ignored while paused. Stop does not cancel
 work already submitted. Typed requests work without enabling the microphone.
+Say **Skip** to interrupt feedback while staying in command mode.
+
+The combined server supports both `/utterance` (AI interpretation) and
+`/command` (canonical commands) with one molecule and undo history. Point the
+frontend to this same server. The alternative `api.py` server on port 5000 uses
+the same command engine code but, as a separate process, has its own session;
+do not run both expecting a shared molecule. Main's named-molecule library,
+name lookup, and halogen edits are supported through the shared engine.
 
 Gemini translates finalized speech segments, which can contain several actions.
 The app executes clear steps until the first ambiguity, explains what is queued,

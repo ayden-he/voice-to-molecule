@@ -29,7 +29,13 @@ export async function runSessionTests(create = createSession) {
   release();
   await session.settled();
   assert(submitted.join() === 'carbon,undo', 'stop preserves accepted work; pause rejects new work');
-  return '7 session checks passed';
+  session.enabled(); session.receive('start');
+  const beforeSkip = interrupted;
+  session.receive('skip');
+  await session.settled();
+  assert(interrupted === beforeSkip + 1 && session.mode() === 'active', 'skip stops feedback without disabling commands');
+  assert(submitted.join() === 'carbon,undo', 'skip uses no AI quota');
+  return '9 session checks passed';
 }
 
 console.log(await runSessionTests());

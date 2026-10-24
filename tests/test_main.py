@@ -57,8 +57,11 @@ def test_help_unknown_and_quit(capsys):
     builder = Builder()
     assert text_app.handle_line("help", builder) is True
     output = capsys.readouterr().out
+    # Help teaches how to do each kind of thing with one example each. It no
+    # longer advertises the unimplemented "save" placeholder or a redundant
+    # "help" entry.
     for command in ("add carbon", "add oxygen", "go to atom", "undo",
-                    "read it back", "summary", "save", "help", "quit"):
+                    "read it back", "summary", "quit"):
         assert command in output
     assert "SMILES: empty" in output
     assert text_app.handle_line("nonsense", builder) is True
@@ -222,19 +225,31 @@ def test_extended_command_scripts(commands, expected, capsys):
     assert text_app.export.CURRENT_IMAGE.exists() == bool(expected)
 
 
-@pytest.mark.parametrize("command", ["add nitrogen", "add chlorine", "add N", "add hydrogen",
-    "add sulfur to atom two", "ADD BROMINE DOUBLE-BOND!", "add sodium"])
+@pytest.mark.parametrize("command", ["add nitrogen", "add N", "add hydrogen",
+    "add sulfur to atom two", "add sodium", "add phosphorus"])
 def test_other_element_feedback_is_spoken_and_preserves_state(command, capsys):
     builder = Builder()
     builder.add_atom("C")
     before = builder.smiles(), builder.describe_atoms(), builder.current_atom
     assert text_app.handle_line(command, builder)
-    message = "Only carbon and oxygen can be added. Hydrogens are added automatically."
+    message = text_app.ELEMENT_MESSAGE
     assert capsys.readouterr().out == message + "\n"
     text_app.speech.speak.assert_called_with(message)
     assert (builder.smiles(), builder.describe_atoms(), builder.current_atom) == before
     builder.undo()
     assert builder.smiles() == ""
+
+
+@pytest.mark.parametrize("command, symbol", [
+    ("add chlorine", "Cl"), ("add fluorine to atom one", "F"),
+    ("add bromine", "Br"), ("add iodine", "I"),
+])
+def test_halogens_build_over_the_text_interface(command, symbol, capsys):
+    builder = Builder()
+    builder.add_atom("C")
+    assert text_app.handle_line(command, builder)
+    assert symbol in [a["symbol"] for a in builder.describe_atoms()]
+    assert "SMILES:" in capsys.readouterr().out
 
 
 def test_navigation_options_and_grouped_help_are_read_only(capsys, monkeypatch):
@@ -256,8 +271,11 @@ def test_navigation_options_and_grouped_help_are_read_only(capsys, monkeypatch):
     text_app.speech.speak.assert_called_with(text_app.OPTIONS_TEXT)
     text_app.handle_line("help", builder)
     output = capsys.readouterr().out
-    for label in ("Build:", "Groups:", "Rings:", "Edit:", "Navigate:", "Read:", "Other:"):
-        assert label in output
+    # Help covers each kind of action with a worked example, and points to
+    # "what can I add" for the full group/ring lists.
+    for phrase in ("add carbon", "add oxygen double bond", "add methyl",
+                   "add benzene ring", "what can I add", "undo", "read it back"):
+        assert phrase in output
     save.assert_not_called()
     builder.undo()
     assert builder.current_atom is None
@@ -324,3 +342,79 @@ def test_targeted_chain_and_ring_are_atomic(command, expected, capsys):
     assert (builder.smiles(), builder.describe_atoms(), builder.current_atom) == before
     builder.undo()
     assert builder.smiles() == ""
+
+@pytest.mark.parametrize("command, expected", [
+    ("build aspirin", "CC(=O)Oc1ccccc1C(=O)O"),
+    ("load acetic acid", "CC(=O)O"),
+    ("make glucose", "OCC1OC(O)C(O)C(O)C1O"),
+])
+def test_named_molecule_commands_build_structure(command, expected, capsys):
+    builder = Builder()
+    assert text_app.handle_line(command, builder) is True
+    assert Chem.CanonSmiles(builder.smiles()) == Chem.CanonSmiles(expected)
+    assert "SMILES:" in capsys.readouterr().out
+
+def test_unknown_named_molecule_is_reported_and_leaves_state(capsys):
+    builder = Builder()
+    builder.add_atom("C")
+    assert text_app.handle_line("build unobtainium", builder) is True
+    output = capsys.readouterr().out
+    assert "don't have that molecule" in output
+    assert "SMILES:" not in output          # failure prints no SMILES line
+    assert builder.smiles() == "C"           # unchanged
+
+def test_named_molecule_is_undoable(capsys):
+    builder = Builder()
+    text_app.handle_line("build benzene", builder)
+    assert Chem.CanonSmiles(builder.smiles()) == Chem.CanonSmiles("c1ccccc1")
+    builder.undo()
+    assert builder.smiles() == ""
+
+def test_skip_stops_speech_without_speaking(capsys):
+    builder = Builder()
+    text_app.speech.stop_speaking.reset_mock()
+    text_app.speech.speak.reset_mock()
+    assert text_app.handle_line("skip", builder) is True
+    text_app.speech.stop_speaking.assert_called_once()
+    text_app.speech.speak.assert_not_called()
+    assert capsys.readouterr().out == "Stopped.\n"
+    assert "SMILES:" not in capsys.readouterr().out
+
+def test_skip_leaves_molecule_unchanged(capsys):
+    builder = Builder()
+    builder.add_atom("C")
+    text_app.handle_line("skip", builder)
+    assert builder.smiles() == "C"
+    assert builder.current_atom == 1
+
+def test_name_command_speaks_pubchem_result(capsys, monkeypatch):
+    from unittest.mock import Mock
+    monkeypatch.setattr(text_app.naming, "lookup_name",
+                        Mock(return_value=("Aspirin", "2-acetyloxybenzoic acid",
+                                           "This molecule is Aspirin. Its systematic name is 2-acetyloxybenzoic acid.")))
+    builder = Builder()
+    builder.add_atom("C")
+    assert text_app.handle_line("name", builder) is True
+    out = capsys.readouterr().out
+    assert "Aspirin" in out and "2-acetyloxybenzoic acid" in out
+    text_app.naming.lookup_name.assert_called_once()
+
+def test_name_command_handles_network_failure(capsys, monkeypatch):
+    from unittest.mock import Mock
+    monkeypatch.setattr(text_app.naming, "lookup_name",
+                        Mock(return_value=(None, None,
+                                           "I couldn't reach the naming service. "
+                                           "Check your internet connection and try again.")))
+    builder = Builder()
+    builder.add_atom("C")
+    assert text_app.handle_line("name", builder) is True
+    assert "couldn't reach the naming service" in capsys.readouterr().out
+
+def test_name_command_empty_molecule_skips_lookup(capsys, monkeypatch):
+    from unittest.mock import Mock
+    lookup = Mock()
+    monkeypatch.setattr(text_app.naming, "lookup_name", lookup)
+    builder = Builder()
+    assert text_app.handle_line("name", builder) is True
+    assert "empty" in capsys.readouterr().out
+    lookup.assert_not_called()

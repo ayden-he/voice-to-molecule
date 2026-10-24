@@ -12,6 +12,9 @@ export function createSession({ submit, stopSpeech, status, changed = () => {} }
     if (control === 'start') { setMode('active'); status('Accepting commands.'); return; }
     if (control === 'pause') { stopSpeech(); setMode('paused'); status('Paused. Say Start to resume.'); return; }
     if (mode !== 'active' || !text.trim()) return;
+    if (['skip', 'stop talking', 'be quiet', 'shush'].includes(control)) {
+      stopSpeech(); status('Spoken feedback stopped.'); return;
+    }
     if (control === 'undo') stopSpeech();
     // Preserve spoken order, including undo, while earlier AI requests finish.
     tail = tail.then(() => submit(text)).catch(() => {

@@ -16,7 +16,7 @@ route replaces the original regex-only language interpretation by user request.
 
 ## Base
 - Local dev server, e.g. http://127.0.0.1:5000
-- All request and response bodies are JSON.
+- Requests are JSON. Responses are JSON except `/utterance` (NDJSON) and images.
 - One molecule-building session per server process is fine for the hackathon
   (a single shared Builder). Multi-user sessions are out of scope.
 
@@ -39,6 +39,12 @@ the ordinary molecule state fields. GET `/state` returns the latest snapshot;
 GET `/image` returns numbered SVG. Requests are serialized client-side and
 server-side. Each successful mutation has one Builder undo step. A browser
 disconnect does not cancel an already accepted request.
+The combined voice server also provides `/command`, sharing this exact engine
+and undo stack. Direct edits hold pending voice plans for clarification because
+their context changed. `command_engine.py` supplies the dispatcher to both this
+server and Flask `api.py`. Separate server processes have separate sessions;
+configure the frontend to use one selected server for all molecule requests.
+The voice server serves SVG; Flask also supports PNG as described below.
 
 Enable microphone starts paused. Start enables commands; Pause disables
 commands including Undo while retaining recognition; Stop aborts recognition
@@ -48,6 +54,9 @@ immediately and executes after earlier submitted requests finish. Already
 submitted work runs even after Pause/Stop. Recognition uses finalized segments,
 not revisable interim transcripts. Updates occur per action after a segment
 is finalized and interpreted; this is not word-by-word speculative execution.
+Skip (also "stop talking", "be quiet", "shush") stops feedback while command
+mode remains active, without an AI request. Stop still turns off the microphone.
+Skip is ignored while paused, consistently with other non-control commands.
 
 Clear steps before the first ambiguity execute; the ambiguous step and all
 following instructions are held. The question explicitly announces queued
@@ -85,8 +94,9 @@ grammars have no recognition effect. No local-only processing is promised.
 
 ## POST /command
 
-This is the original team integration contract, not an endpoint implemented
-by `voice_server.py`; the continuous app uses `/utterance` above.
+Implemented by both Flask `api.py` and the combined `voice_server.py`. The
+continuous app uses `/utterance` for language interpretation and this same
+dispatcher for its resulting canonical commands.
 Run one command (the same strings the terminal app accepts, e.g. "add carbon",
 "add oxygen double bond to atom two", "read it back").
 

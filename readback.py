@@ -1,9 +1,9 @@
 """Turn public Builder descriptions into text suitable for speaking aloud."""
 
-from builder import Builder
+from builder import Builder, ELEMENT_NAMES
 
 
-_NAMES = {"C": "carbon", "O": "oxygen"}
+_NAMES = ELEMENT_NAMES
 _BONDS = {1: "single bond", 2: "double bond", 3: "triple bond"}
 
 
@@ -20,7 +20,7 @@ def _join(items: list) -> str:
 
 
 def summary(builder: Builder) -> str:
-    """Report composition, atom count, and RDKit's implicit hydrogen total."""
+    """Report composition and RDKit's implicit hydrogen total."""
     atoms = builder.describe_atoms()
     if not atoms:
         return "The molecule is empty."
@@ -30,10 +30,7 @@ def summary(builder: Builder) -> str:
         if count:
             composition.append(_count(count, name))
     hydrogens = sum(atom["implicit_hydrogens"] for atom in atoms)
-    return "{}, {} in total, {}.".format(
-        _join(composition), _count(len(atoms), "atom"),
-        _count(hydrogens, "hydrogen"),
-    )
+    return "{}.".format(_join(composition + [_count(hydrogens, "hydrogen")]))
 
 
 def detail(builder: Builder) -> str:

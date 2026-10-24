@@ -42,7 +42,8 @@ async function submit(text) {
       const event = JSON.parse(buffer.slice(0, boundary));
       buffer = buffer.slice(boundary + 1);
       render(event);
-      say(event.message);
+      if (event.speech_action === 'stop') stopSpeech();
+      else say(event.message);
     }
     if (done) break;
   }

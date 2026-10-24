@@ -5,6 +5,24 @@ from typing import Any, Dict, List, Optional, Tuple
 from rdkit import Chem
 
 
+# The single source of truth for which elements the tool supports. Everything
+# else (parser, readback, help, the add-atom check, the library's structure
+# check) derives from these, so the supported set is defined in exactly one
+# place. Hydrogens stay implicit and are never placed by the user.
+ELEMENT_NAMES = {
+    "C": "carbon", "O": "oxygen",
+    "F": "fluorine", "Cl": "chlorine", "Br": "bromine", "I": "iodine",
+}
+# Maximum bond-order sum per element. Carbon 4, oxygen 2, halogens 1.
+ELEMENT_VALENCE = {"C": 4, "O": 2, "F": 1, "Cl": 1, "Br": 1, "I": 1}
+
+# The plain-language rejection for anything outside the supported set.
+UNSUPPORTED_ELEMENT_MESSAGE = (
+    "Only carbon, oxygen, and the halogens fluorine, chlorine, bromine, and "
+    "iodine can be added. Hydrogens are added automatically."
+)
+
+
 class Builder:
     """Keep an RDKit molecule, a 1-based cursor, and previous states."""
 
@@ -25,10 +43,9 @@ class Builder:
 
     def _commit(self, candidate, current, message):
         """Validate a private copy before saving one undo snapshot."""
-        limits = {"C": 4, "O": 2}
         for atom in candidate.GetAtoms():
             used = sum(b.GetBondTypeAsDouble() for b in atom.GetBonds())
-            if used > limits[atom.GetSymbol()]:
+            if used > ELEMENT_VALENCE[atom.GetSymbol()]:
                 return False, "That bond would exceed the maximum valence of atom {}.".format(atom.GetIdx() + 1)
         try:
             Chem.SanitizeMol(candidate)
@@ -44,8 +61,8 @@ class Builder:
     def add_atom(self, symbol: str, bond_order: int = 1,
                  to_atom: Optional[int] = None) -> Tuple[bool, str]:
         """Add carbon or oxygen at an explicit target or the current atom."""
-        if not isinstance(symbol, str) or symbol not in ("C", "O"):
-            return False, "Only carbon and oxygen can be added. Hydrogens are added automatically."
+        if not isinstance(symbol, str) or symbol not in ELEMENT_NAMES:
+            return False, UNSUPPORTED_ELEMENT_MESSAGE
         if type(bond_order) is not int or bond_order not in self._BONDS:
             return False, "Choose a single, double, or triple bond."
         if to_atom is not None and not self._valid_atom(to_atom):
@@ -55,7 +72,7 @@ class Builder:
         index = candidate.AddAtom(Chem.Atom(symbol))
         if target is not None:
             candidate.AddBond(target - 1, index, self._BONDS[bond_order])
-        name = {"C": "carbon", "O": "oxygen"}[symbol]
+        name = ELEMENT_NAMES[symbol]
         return self._commit(candidate, index + 1,
                             "Added {} as atom {}.".format(name, index + 1))
 
@@ -115,6 +132,35 @@ class Builder:
 
     def reset(self):
         return self._commit(Chem.RWMol(), None, "Started over with an empty molecule.")
+
+    def load_molecule(self, smiles):
+        """Replace the molecule from a SMILES string, as one undoable action.
+
+        Used by the named-molecule library. The structure still goes through the
+        same valence and sanitize checks as every other edit, and must contain
+        only carbon and oxygen (hydrogens implicit); anything else is rejected so
+        the C/O/H scope cannot be bypassed through the library.
+        """
+        if not isinstance(smiles, str) or not smiles:
+            return False, "That molecule could not be loaded."
+        parsed = Chem.MolFromSmiles(smiles)
+        if parsed is None:
+            return False, "That molecule could not be loaded."
+        for atom in parsed.GetAtoms():
+            if atom.GetSymbol() not in ELEMENT_NAMES:
+                return False, UNSUPPORTED_ELEMENT_MESSAGE
+        # Store explicit single/double bonds so the valence check in _commit does
+        # not read aromatic bonds as 1.5 and wrongly flag fused rings (e.g.
+        # naphthalene). _commit re-sanitizes and re-kekulizes the result.
+        try:
+            Chem.Kekulize(parsed, clearAromaticFlags=True)
+        except Exception:
+            return False, "That molecule could not be loaded."
+        candidate = Chem.RWMol(parsed)
+        # Cursor follows the last atom, matching how building leaves the cursor.
+        last = candidate.GetNumAtoms()
+        return self._commit(candidate, last if last else None,
+                            "Loaded the molecule.")
 
     def _compound(self, actions, message):
         """Run ordinary edits on an isolated builder, then commit just once."""

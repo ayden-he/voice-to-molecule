@@ -1,75 +1,49 @@
 """Ordered execution and clarification barriers, independent of microphone/AI."""
 
-from builder import Builder
-from main import HELP_TEXT, OPTIONS_TEXT, ELEMENT_MESSAGE
-from parser import parse
-from readback import detail, summary
-from rdkit.Chem.Draw import rdMolDraw2D
+from command_engine import CommandEngine
 from interpreter import InterpretationError, validate_plan
 
 
 class Conversation:
-    def __init__(self, interpret):
-        self.builder = Builder()
+    def __init__(self, interpret, engine=None):
+        self.engine = engine or CommandEngine()
         self.interpret = interpret
         self.pending = []
         self.message = "Enable your microphone, then say Start."
-        self.version = 0
+        self._speech_action = None
+
+    @property
+    def builder(self):
+        return self.engine.builder
+
+    @property
+    def version(self):
+        return self.engine.version
 
     def state(self):
-        return {"smiles": self.builder.smiles(), "summary": summary(self.builder),
-                "detail": detail(self.builder), "atoms": self.builder.describe_atoms(),
-                "current_atom": self.builder.current_atom, "message": self.message,
-                "version": self.version, "queued": [s["source"] for s in self.pending],
-                "image_url": "/image?v={}".format(self.version)}
+        return dict(self.engine.snapshot(), message=self.message,
+                    version=self.version, queued=[step["source"] for step in self.pending])
 
     def image(self):
-        molecule = self.builder.molecule_copy()
-        if not molecule.GetNumAtoms():
-            return '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><text x="30" y="60" font-size="28">Your molecule is empty.</text></svg>'
-        for atom in molecule.GetAtoms():
-            atom.SetProp("atomNote", str(atom.GetIdx() + 1))
-        drawer = rdMolDraw2D.MolDraw2DSVG(800, 600)
-        highlight = [] if self.builder.current_atom is None else [self.builder.current_atom - 1]
-        rdMolDraw2D.PrepareAndDrawMolecule(drawer, molecule, highlightAtoms=highlight)
-        drawer.FinishDrawing()
-        return drawer.GetDrawingText()
+        return self.engine.svg() or ('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
+                                    '<text x="30" y="60" font-size="28">Your molecule is empty.</text></svg>')
 
     def execute(self, text):
-        command = parse(text)
-        if command is None:
-            return False, "That command was not understood."
-        action = command["action"]
-        b = self.builder
-        calls = {
-            "add_atom": lambda: b.add_atom(command["symbol"], command["bond_order"], command.get("to_atom")),
-            "add_chain": lambda: b.add_chain(command["count"], to_atom=command.get("to_atom")),
-            "add_group": lambda: b.add_group(command["name"], command.get("to_atom")),
-            "add_ring": lambda: b.add_ring(command["kind"], to_atom=command.get("to_atom")),
-            "connect": lambda: b.connect(command["a"], command["b"], command["bond_order"]),
-            "close_ring": lambda: b.connect(b.current_atom, 1),
-            "set_bond_order": lambda: b.set_bond_order(command["a"], command["b"], command["order"]),
-            "delete_atom": lambda: b.delete_atom(command["atom_number"]),
-            "reset": b.reset, "undo": b.undo,
-        }
-        if action in calls:
-            ok, message = calls[action]()
-            if ok:
-                self.version += 1
-            return ok, message
-        if action == "read_back":
-            return True, detail(b)
-        if action == "summary":
-            return True, summary(b)
-        if action == "help":
-            return True, HELP_TEXT
-        if action == "what_can_i_add":
-            return True, OPTIONS_TEXT
-        if action == "where_am_i":
-            return True, "Current atom: {}.".format(b.current_atom or "none")
-        if action == "unsupported_element":
-            return False, ELEMENT_MESSAGE
-        return False, "That command is unavailable in the browser."
+        result = self.engine.run_command(text)
+        self._speech_action = result.get("speech_action")
+        return result["ok"], result["message"]
+
+    def direct_command(self, text):
+        """Canonical /command requests share the voice engine and undo history."""
+        version = self.version
+        result = self.engine.run_command(text)
+        self.message = result["message"]
+        if self.version != version and self.pending:
+            for step in self.pending:
+                step["command"] = ""
+                step["question"] = "The molecule changed. How should I continue this instruction?"
+            self.message += " Pending voice instructions remain held for clarification."
+        return dict(result, **{key: value for key, value in self.state().items()})
 
     def queued_message(self):
         if not self.pending:
@@ -83,6 +57,9 @@ class Conversation:
         def report(ok, message):
             self.message = message
             event = dict(self.state(), ok=ok)
+            if self._speech_action:
+                event["speech_action"] = self._speech_action
+                self._speech_action = None
             events.append(event)
             emit(event)
         if text.strip().lower().rstrip('.!?') == "undo":

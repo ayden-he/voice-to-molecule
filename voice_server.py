@@ -72,7 +72,7 @@ def make_server(port=8001, interpret=None):
             if self.headers.get("Origin", expected) != expected:
                 self.send(403, '{"message":"Cross-origin request rejected."}')
                 return
-            if self.path != "/utterance":
+            if self.path not in ("/utterance", "/command"):
                 self.send(404, '{}')
                 return
             try:
@@ -86,6 +86,12 @@ def make_server(port=8001, interpret=None):
                 self.send(400, '{"message":"Send a nonempty text string."}')
                 return
             with command_lock:
+                if self.path == "/command":
+                    event = conversation.direct_command(text)
+                    with snapshot_lock:
+                        snapshot.update(state=event, image=conversation.image())
+                    self.send(200, json.dumps(event))
+                    return
                 self.send_response(200)
                 self.send_header("Content-Type", "application/x-ndjson")
                 self.send_header("Cache-Control", "no-store")

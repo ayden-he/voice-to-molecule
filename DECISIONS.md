@@ -1,5 +1,28 @@
 # Decisions
 
+## Merge main into the Gemini voice branch
+
+- Preserve the explicitly approved AI interpretation route and main's expanded
+  element support when resolving SPEC.md. Pull supported element names from
+  Builder into the AI instructions instead of retaining the C/O-only prompt.
+- Extract main's pure command dispatcher and numbered SVG drawing into
+  `CommandEngine`. Flask API and Conversation both use it. Named library loads,
+  halogen edits, name lookups, and undo now have the same behavior in both.
+  The voice server exposes canonical `/command` alongside AI `/utterance`;
+  both endpoints share one engine, lock, molecule, and undo history. Separate
+  server processes remain separate sessions, so the frontend must target one.
+- Direct edits while a voice plan is held require fresh clarification, since
+  the molecule context changed. Keep the requested Stop microphone semantics;
+  handle Skip locally to stop feedback without disabling command mode or
+  consuming an API call. AI-interpreted Skip returns a speech-action marker.
+- Preserve the platform-independent viewer integration test fix. Its old
+  subprocess mock was a test bug, not a missing Windows viewer implementation.
+- **Validation:** 774 Python tests passed, including mixed canonical/AI endpoint
+  history, halogenated library loads, name lookup, Skip, and changed-context
+  barriers. All 34 mocked JavaScript checks passed in V8. Python 3.9 syntax and
+  diff whitespace checks pass. No live Gemini quota was consumed during merge
+  verification; post-merge microphone/AI smoke testing remains manual.
+
 ## Gemini error diagnostics
 
 - Generic HTTP failure feedback hid the cause of a live request rejection.
@@ -483,3 +506,102 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   `python3 -m pytest -q` reports **444 passed**. Tests pin platforms and mock all
   speech and viewer launches, including Windows quote escaping, Linux arguments,
   and missing-engine fallback on macOS, Windows, and Linux.
+
+## HTTP API for the website
+
+- Added `api.py` (Flask), exposing `POST /command`, `GET /state`, and `GET /image`.
+  It reuses `parse()` and `Builder` with its own data-returning dispatch, leaving
+  `main.py` and its tests unchanged. One shared molecule per server process keeps
+  the hackathon session simple; CORS is enabled for local development. SVG is
+  preferred for the web via RDKit `MolDraw2DSVG`, with PNG also available.
+  Alternatives were extracting the terminal dispatch or duplicating chemistry;
+  this keeps the requested independent HTTP layer while RDKit remains the
+  chemistry authority. Added Flask to requirements. On Python 3.9.6,
+  `python3 -m pytest -q` reports **456 passed**. The supplied PNG-signature test
+  literal was written with escaped newlines to preserve valid Python syntax.
+
+## Curated named-molecule library
+
+- Added `library.py`, a static curated mapping of common names and synonyms to
+  verified C/H/O SMILES. Lookup is punctuation/case-insensitive and never guesses
+  unknown names; no AI or web lookup is involved. `Builder.load_molecule` loads
+  SMILES as one undoable action through the existing sanitize/valence path and
+  enforces C/O-only atoms with implicit hydrogens. Aromatic structures are
+  kekulized before valence checks, including fused rings such as naphthalene.
+- The parser recognizes `build/load/make <name>` before its signed-number guard
+  so hyphenated names work. Both `main.py` and `api.py` resolve names through the
+  library and call the Builder. Unknown names leave the molecule unchanged.
+  Sugars and menthol are connectivity-only, with no stereochemistry, matching
+  project scope. Alternatives were guessing names or generating structures;
+  fixed lookup keeps behavior deterministic and RDKit the chemistry authority.
+- Validation: `python3 -m pytest -q` with the Python 3.9.6 project environment
+  reports **637 passed**, covering every entry, synonyms, invalid input,
+  element restrictions, undo, parser commands, and terminal/API integration.
+
+## Summary wording
+
+- Removed the atom count from `summary()` because "N atoms in total" was
+  ambiguous: it counted only user-placed carbon/oxygen, not implicit hydrogens.
+  Summary now reports composition and hydrogen count only; `detail()` is
+  unchanged. Updated only the six corresponding summary expectations.
+
+## Skip spoken output
+
+- Added `skip` (aliases `stop`, `shush`, `be quiet`, and `stop talking`) to
+  silence a long readback using the existing `speech.stop_speaking()`. It prints
+  "Stopped." without speaking, avoiding a new utterance after interruption.
+  The API acknowledges the command because the browser owns playback there.
+  Chemistry and molecule state are unchanged.
+
+## How-to help text
+
+- Rewrote help to a how-to-with-one-example style: each line shows how to do
+  one kind of action. Full group/ring lists are deferred to "what can I add".
+  Dropped the unimplemented "save" and redundant "help" entries from the help
+  text. Command logic is unchanged; updated the two help-content tests.
+
+## Skip feature consistency
+
+- Confirmed the complete skip feature is present in the working tree: parser
+  aliases (`skip`, `stop`, `shush`, `be quiet`, `stop talking`), the `api.py`
+  acknowledgment, and parser/API skip tests are consistent with the existing
+  terminal handler. These pieces were already present as uncommitted changes
+  when the reported half-applied state was checked, so no duplicate code or
+  tests were added. Left `main.py` and its skip tests untouched.
+- Validation: `python3 -m pytest -q` on Python 3.9.6 reports **647 passed**.
+
+## PubChem molecule names
+
+- Added `name` and its aliases to look up the current molecule by URL-encoded
+  SMILES through PubChem PUG-REST, reporting both the common Title and IUPAC name.
+  This is the program's only network call; chemistry remains with RDKit. The
+  request uses a 10-second timeout and returns plain messages for handled
+  offline/timeout/not-found and malformed-response failures. Molecules without
+  stereochemistry (such as glucose) may receive a generic name like "Hexose".
+- Used the supplied implementation and tests. The socket timeout is not a strict
+  total wall-clock deadline, and the supplied response checks do not cover every
+  malformed field type, so an absolute never-crash/never-hang guarantee is not
+  established. All network access in tests is mocked; the Python 3.9.6 suite
+  reports **668 passed**.
+
+## Halogen support
+
+- Added fluorine, chlorine, bromine, and iodine (F, Cl, Br, I), all valence 1
+  and single-bond only, with no charges or aromaticity. Centralized supported
+  element names, valences, and rejection wording in `builder.py` through
+  `ELEMENT_NAMES`, `ELEMENT_VALENCE`, and `UNSUPPORTED_ELEMENT_MESSAGE`.
+  Readback and cursor descriptions use the shared names; help/options and the
+  library structure check reflect the supported set. The parser currently has
+  its own explicit name-to-symbol mapping for the same set.
+- Nitrogen and other elements remain rejected. Chose halogens because fixed
+  valence 1 makes them chemically simple additions while keeping the C/O/H
+  guardrail intact for everything else. Updated SPEC scope and terminal tests.
+
+## Halogenated library molecules
+
+- Added 20 common halogenated molecules (halomethanes, haloethanes/alkenes,
+  halobenzenes, and chloro/trifluoroacetic acid) with common aliases. Updated
+  the library element-scope test to allow supported halogens instead of only
+  carbon/oxygen, using `ELEMENT_NAMES` as the allowed set. Structures remain
+  fixed curated SMILES validated by RDKit. Python 3.9.6 validation:
+  `python3 -m pytest -q` reports **746 passed**.

@@ -4,30 +4,40 @@ import argparse
 from typing import List, Optional
 
 import export
+import library
+import naming
 import speech
-from builder import Builder
+from builder import Builder, ELEMENT_NAMES
 from parser import parse
 from readback import detail, summary
 
 
-OPTIONS_TEXT = """Elements: carbon and oxygen. Hydrogens are added automatically.
+OPTIONS_TEXT = """Elements: carbon, oxygen, and the halogens fluorine, chlorine,
+bromine, and iodine. Hydrogens are added automatically.
 Groups: methyl, ethyl, hydroxyl, methoxy, aldehyde, carboxylic acid.
 Rings: cyclopropane, cyclobutane, cyclopentane, cyclohexane, benzene."""
 
-HELP_TEXT = """Commands (numbers: digits or words one through thirty):
-Build: add carbon; add oxygen double bond; add five carbons.
-Groups: add methyl; add ethyl; add hydroxyl; add methoxy; add aldehyde;
-  add carboxylic acid. Build commands can end with: to atom N.
-Rings: add cyclopropane; add cyclobutane; add cyclopentane; add cyclohexane;
-  add benzene ring; bond atom six to atom one; close the ring.
-Edit: change the bond between two and three to double (or single, triple);
-  delete atom five; start over; undo.
-Navigate: go to atom N; where am I; what can I add.
-Read: read it back (also: read back, describe); summary.
-Other: show; save (not built yet); faster; slower; help; quit."""
+HELP_TEXT = """You build molecules from carbon, oxygen, and the halogens
+(fluorine, chlorine, bromine, iodine). Hydrogens are added for you, and each new
+atom attaches to your current atom.
+To add an atom, say "add carbon", "add oxygen", or "add chlorine".
+To add a double or triple bond, say it in the command, like "add oxygen double bond".
+To attach to a specific atom, end with its number, like "add carbon to atom two".
+To add several atoms at once, say "add five carbons".
+To add a group, name it, like "add methyl". Say "what can I add" for the full list of groups.
+To add a ring, name it, like "add benzene ring". Say "what can I add" for the full list of rings.
+To build a known molecule, say "build" and its name, like "build aspirin".
+To connect two atoms into a ring, say "bond atom six to atom one".
+To change a bond, say "change the bond between two and three to double".
+To move to another atom, say "go to atom two".
+To remove an atom, say "delete atom five".
+To undo your last step, say "undo". To clear everything, say "start over".
+To hear your molecule, say "read it back" for the full details, or "summary" for the totals.
+To check where you are, say "where am I".
+To change the voice, say "faster" or "slower". To stop the voice, say "skip".
+To finish, say "quit"."""
 
-ELEMENT_MESSAGE = ("Only carbon and oxygen can be added. "
-                   "Hydrogens are added automatically.")
+from builder import UNSUPPORTED_ELEMENT_MESSAGE as ELEMENT_MESSAGE
 
 
 def _report(text: str) -> None:
@@ -48,12 +58,26 @@ def handle_line(text: str, builder: Builder) -> bool:
     if action == "quit":
         speech.stop_speaking()
         return False
+    if action == "skip":
+        # Stop the current readback. Print only (do not speak) so this command
+        # produces silence rather than more speech to interrupt.
+        speech.stop_speaking()
+        print("Stopped.")
+        return True
     if action in ("faster", "slower"):
         rate = speech.set_rate(speech.RATE + (40 if action == "faster" else -40))
         _report("Speech rate is now {} words per minute.".format(rate))
         return True
     if action in ("read_back", "summary"):
         _report(detail(builder) if action == "read_back" else summary(builder))
+        return True
+    if action == "name":
+        if builder.current_atom is None:
+            _report("The molecule is empty.")
+        else:
+            _report("Looking up the name...")
+            _, _, message = naming.lookup_name(builder.smiles())
+            _report(message)
         return True
     if action == "unsupported_element":
         _report(ELEMENT_MESSAGE)
@@ -63,7 +87,7 @@ def handle_line(text: str, builder: Builder) -> bool:
             _report("The molecule is empty. There is no current atom.")
         else:
             atom = builder.describe_atoms()[builder.current_atom - 1]
-            name = {"C": "carbon", "O": "oxygen"}[atom["symbol"]]
+            name = ELEMENT_NAMES[atom["symbol"]]
             _report("You are at atom {}, {}.".format(builder.current_atom, name))
         return True
     if action == "what_can_i_add":
@@ -81,7 +105,15 @@ def handle_line(text: str, builder: Builder) -> bool:
         _report(HELP_TEXT)
         success = True
     else:
-        if action == "add_atom":
+        if action == "load_named":
+            smiles = library.lookup(command["name"])
+            if smiles is None:
+                success, message = False, (
+                    "I don't have that molecule in the library. You can build it "
+                    "step by step, or try: aspirin, glucose, acetic acid.")
+            else:
+                success, message = builder.load_molecule(smiles)
+        elif action == "add_atom":
             success, message = builder.add_atom(command["symbol"], command["bond_order"], command.get("to_atom"))
         elif action == "add_chain":
             success, message = builder.add_chain(command["count"], to_atom=command.get("to_atom"))

@@ -198,7 +198,68 @@ def test_http_stream_has_separate_states_and_images():
             assert b"svg" in response.read()
         with urlopen(base + "/state") as response:
             assert json.load(response)["smiles"] == "CO"
+        # The team's canonical endpoint uses this same molecule and undo stack.
+        request = Request(base + '/command', data=b'{"text":"undo"}',
+                          headers={'Content-Type': 'application/json'})
+        with urlopen(request) as response:
+            assert json.load(response)['smiles'] == 'C'
+        request = Request(base + '/command', data=b'{"text":"add chlorine"}',
+                          headers={'Content-Type': 'application/json'})
+        with urlopen(request) as response:
+            assert json.load(response)['smiles'] == 'CCl'
+        with urlopen(base + '/state') as response:
+            assert json.load(response)['smiles'] == 'CCl'
     finally:
         server.shutdown()
         server.server_close()
         thread.join()
+
+
+def test_voice_supports_main_named_library_and_individual_undo():
+    responses = iter([
+        [step('chloroform', 'build chloroform')],
+        [step('oxygen', 'add oxygen to atom 1')],
+    ])
+    session = Conversation(lambda *_: next(responses))
+    assert session.accept('make chloroform')[-1]['ok']
+    loaded = session.builder.smiles()
+    assert 'Cl' in loaded
+    assert session.accept('add oxygen to the carbon')[-1]['ok']
+    session.accept('undo')
+    assert session.builder.smiles() == loaded
+    session.accept('undo')
+    assert session.builder.smiles() == ''
+
+
+def test_voice_name_lookup_uses_main_service_without_mutation(monkeypatch):
+    import naming
+    monkeypatch.setattr(naming, 'lookup_name', lambda _: ('Methane', 'methane', 'Methane.'))
+    session = Conversation(lambda *_: [step('name this', 'name')])
+    session.direct_command('add carbon')
+    version = session.version
+    assert session.accept('what is this molecule')[-1]['message'] == 'Methane.'
+    assert session.version == version
+
+
+def test_skip_plan_stops_feedback_without_changing_molecule():
+    session = Conversation(lambda *_: [step('stop talking please', 'skip')])
+    event = session.accept('stop talking please')[-1]
+    assert event['speech_action'] == 'stop'
+    assert session.version == 0
+
+
+def test_direct_edit_holds_pending_voice_plan_until_reclarified():
+    session = Conversation(lambda *_: [step('that group', question='Which group?'),
+                                      step('oxygen', 'add oxygen')])
+    session.accept('that group then oxygen')
+    session.direct_command('add carbon')
+    assert session.builder.smiles() == 'C'
+    assert all(not item['command'] for item in session.pending)
+    assert 'held' in session.message
+
+
+def test_interpreter_instructions_follow_supported_backend_elements():
+    from builder import ELEMENT_NAMES
+    from interpreter import INSTRUCTIONS
+    assert all(name in INSTRUCTIONS for name in ELEMENT_NAMES.values())
+    assert 'build NAME' in INSTRUCTIONS
