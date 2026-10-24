@@ -393,3 +393,16 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   `python3 -m pytest -q` reports **444 passed**. Tests pin platforms and mock all
   speech and viewer launches, including Windows quote escaping, Linux arguments,
   and missing-engine fallback on macOS, Windows, and Linux.
+
+## HTTP API for the website
+
+- Added `api.py` (Flask), exposing `POST /command`, `GET /state`, and `GET /image`.
+  It reuses `parse()` and `Builder` with its own data-returning dispatch, leaving
+  `main.py` and its tests unchanged. One shared molecule per server process keeps
+  the hackathon session simple; CORS is enabled for local development. SVG is
+  preferred for the web via RDKit `MolDraw2DSVG`, with PNG also available.
+  Alternatives were extracting the terminal dispatch or duplicating chemistry;
+  this keeps the requested independent HTTP layer while RDKit remains the
+  chemistry authority. Added Flask to requirements. On Python 3.9.6,
+  `python3 -m pytest -q` reports **456 passed**. The supplied PNG-signature test
+  literal was written with escaped newlines to preserve valid Python syntax.
