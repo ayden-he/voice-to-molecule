@@ -446,3 +446,13 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   one kind of action. Full group/ring lists are deferred to "what can I add".
   Dropped the unimplemented "save" and redundant "help" entries from the help
   text. Command logic is unchanged; updated the two help-content tests.
+
+## Skip feature consistency
+
+- Confirmed the complete skip feature is present in the working tree: parser
+  aliases (`skip`, `stop`, `shush`, `be quiet`, `stop talking`), the `api.py`
+  acknowledgment, and parser/API skip tests are consistent with the existing
+  terminal handler. These pieces were already present as uncommitted changes
+  when the reported half-applied state was checked, so no duplicate code or
+  tests were added. Left `main.py` and its skip tests untouched.
+- Validation: `python3 -m pytest -q` on Python 3.9.6 reports **647 passed**.

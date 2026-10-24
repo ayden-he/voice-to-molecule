@@ -153,3 +153,8 @@ def test_extended_unrecognized_inputs(text):
 ])
 def test_chain_and_ring_targets(phrase, expected):
     assert parse(phrase) == expected
+
+@pytest.mark.parametrize("phrase", ["skip", "stop", "stop talking", "be quiet",
+                                     "shush", "SKIP!", "  please stop  "])
+def test_skip_variants_parse_to_skip(phrase):
+    assert parse(phrase) == {"action": "skip"}

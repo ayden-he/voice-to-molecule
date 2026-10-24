@@ -61,6 +61,8 @@ _SIMPLE_COMMANDS = {
     "save": "save", "help": "help", "quit": "quit",
     "start over": "reset", "where am i": "where_am_i",
     "what can i add": "what_can_i_add", "close the ring": "close_ring",
+    "skip": "skip", "stop": "skip", "stop talking": "skip",
+    "be quiet": "skip", "shush": "skip",
 }
 
 

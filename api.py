@@ -79,6 +79,10 @@ def run_command(text: str) -> Dict[str, Any]:
             name = {"C": "carbon", "O": "oxygen"}[atom["symbol"]]
             message = "You are at atom {}, {}.".format(_builder.current_atom, name)
         return dict(ok=True, message=message, **_snapshot())
+    # "skip" stops speech. Over HTTP the browser owns playback, so just
+    # acknowledge it; the frontend stops its own speech on seeing this.
+    if action == "skip":
+        return dict(ok=True, message="Stopped.", **_snapshot())
     # Terminal-only actions have no meaning over HTTP; report them politely
     # rather than erroring. The website drives speech/saving on its own side.
     if action in ("quit", "faster", "slower", "save", "show"):

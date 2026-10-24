@@ -128,3 +128,10 @@ def test_named_molecule_rejects_hidden_non_co(client, monkeypatch):
     data = post(client, "build fake").get_json()
     assert data["ok"] is False
     assert "carbon and oxygen" in data["message"]
+
+def test_skip_is_acknowledged_over_api(client):
+    post(client, "add carbon")
+    data = post(client, "skip").get_json()
+    assert data["ok"] is True
+    assert data["message"] == "Stopped."
+    assert data["smiles"] == "C"            # unchanged
