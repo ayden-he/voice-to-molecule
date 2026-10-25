@@ -175,3 +175,13 @@ def test_skip_variants_parse_to_skip(phrase):
                                      "NAME!", "  what is this?  "])
 def test_name_variants_parse_to_name(phrase):
     assert parse(phrase) == {"action": "name"}
+
+
+@pytest.mark.parametrize('phrase', [
+    "what's the name of this molecule?", "What’s the name of this molecule?",
+    'what is the name of this molecule', 'what is this molecule called?',
+    "what's this molecule called?", 'name this molecule',
+    'identify this molecule', 'tell me the name of this molecule please',
+])
+def test_conversational_molecule_name_requests(phrase):
+    assert parse(phrase) == {'action': 'name'}

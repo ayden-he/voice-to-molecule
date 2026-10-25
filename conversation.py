@@ -2,6 +2,7 @@
 
 from command_engine import CommandEngine
 from interpreter import InterpretationError, validate_plan
+from parser import parse
 
 
 class Conversation:
@@ -68,6 +69,15 @@ class Conversation:
                     step["command"] = ""
                     step["question"] = "How should I continue after undo?"
             report(ok, message + (" Pending instructions remain held for clarification." if self.pending else ""))
+            return events
+        # A recognized standalone read-only name request needs no AI confirmation.
+        # Keep an unrelated outstanding clarification intact rather than treating
+        # the user's question as an answer to it.
+        if parse(text) == {"action": "name"}:
+            ok, message = self.execute("name")
+            if self.pending:
+                message += " " + self.pending[0]["question"]
+            report(ok, message)
             return events
         if self.pending:
             first = self.pending[0]

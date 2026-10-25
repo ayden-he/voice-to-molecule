@@ -1,5 +1,18 @@
 # Decisions
 
+## Clear molecule-name questions do not need clarification
+
+- A reported "what's the name of this molecule" request incorrectly triggered
+  Gemini's "Did you mean name?" confirmation. Recognize common standalone name
+  questions directly through the existing parser and backend name lookup, with
+  no Gemini call, edits, undo entry, or discard event. Preserve any unrelated
+  outstanding clarification when the user asks this read-only question.
+- Strengthen the interpreter instructions: conversational wording is sufficient
+  when intent is clear; questions are for missing information or materially
+  different interpretations. Include name-query examples and keep the actual
+  chemistry/name lookup in the backend. Multi-action speech still uses ordered
+  AI interpretation. Tests use mocked PubChem, never model-generated names.
+
 ## Discard instructions after the first confusion
 
 - User replaced the prior queued-tail behavior: keep already applied clear

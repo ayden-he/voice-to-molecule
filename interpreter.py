@@ -39,6 +39,15 @@ If given an unresolved request and clarification, resolve only that request;
 instructions after the ambiguous part were discarded. Never reconstruct them.
 Use 'build NAME' only for a named-molecule library request; do not invent SMILES.
 Use 'name' for a molecule-name lookup. Skip stops feedback, not the microphone.
+Interpret ordinary conversational phrasing by meaning, not by whether it uses
+the exact command word. Do not ask the user to confirm a clear supported intent
+with 'Did you mean ...?'. Ask only when information needed to choose or execute
+an action is missing or multiple interpretations would have different effects.
+Examples of clear name requests: "what's the name of this molecule", "what is
+this molecule called", "tell me its name", and "can you identify this compound".
+Each maps directly to command "name" with an empty question. The molecule to
+identify is the current molecule; do not ask which one. Its name comes from the
+backend lookup, never from your own chemistry knowledge.
 Supported elements: """ + ", ".join(ELEMENT_NAMES.values()) + ".\nSupported vocabulary:\n" + HELP_TEXT
 
 

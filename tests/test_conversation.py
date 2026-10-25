@@ -267,3 +267,49 @@ def test_interpreter_instructions_follow_supported_backend_elements():
     from interpreter import INSTRUCTIONS
     assert all(name in INSTRUCTIONS for name in ELEMENT_NAMES.values())
     assert 'build NAME' in INSTRUCTIONS
+
+
+@pytest.mark.parametrize('phrase', [
+    "what's the name of this molecule", 'what is this molecule called?',
+    'tell me the name of this molecule',
+])
+def test_clear_name_question_never_asks_ai_for_confirmation(monkeypatch, phrase):
+    import naming
+    def must_not_interpret(*_):
+        raise AssertionError('Clear read-only name requests should not need Gemini')
+    monkeypatch.setattr(naming, 'lookup_name', lambda _: ('Methane', 'methane', 'The molecule is methane.'))
+    session = Conversation(must_not_interpret)
+    session.direct_command('add carbon')
+    version = session.version
+    event = session.accept(phrase)[-1]
+    assert event['ok'] and event['message'] == 'The molecule is methane.'
+    assert not event['discard_following']
+    assert session.pending == []
+    assert session.version == version
+    session.accept('undo')
+    assert session.builder.smiles() == ''
+
+
+def test_name_question_preserves_unrelated_clarification(monkeypatch):
+    import naming
+    monkeypatch.setattr(naming, 'lookup_name', lambda _: ('Methane', 'methane', 'Methane.'))
+    session = Conversation(lambda *_: [step('that group', question='Which group?')])
+    session.direct_command('add carbon')
+    session.accept('attach that group')
+    event = session.accept("what's the name of this molecule")[-1]
+    assert event['message'] == 'Methane. Which group?'
+    assert event['clarification'] == 'Which group?'
+    assert not event['discard_following']
+
+
+def test_compound_name_question_still_uses_ordered_ai_plan(monkeypatch):
+    import naming
+    monkeypatch.setattr(naming, 'lookup_name', lambda _: ('Methane', 'methane', 'Methane.'))
+    requests = []
+    def interpret(text, _state):
+        requests.append(text)
+        return [step('carbon', 'add carbon'), step('name', 'name')]
+    session = Conversation(interpret)
+    events = session.accept("add carbon then what's the name of this molecule")
+    assert len(requests) == 1
+    assert len(events) == 2 and events[-1]['message'] == 'Methane.'

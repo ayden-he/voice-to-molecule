@@ -78,6 +78,12 @@ _SIMPLE_COMMANDS = {
     "be quiet": "skip", "shush": "skip",
     "name": "name", "name it": "name", "what is this": "name",
     "what am i building": "name", "what did i make": "name",
+    "what s the name of this molecule": "name",
+    "what is the name of this molecule": "name",
+    "what is this molecule called": "name",
+    "what s this molecule called": "name",
+    "name this molecule": "name", "identify this molecule": "name",
+    "tell me the name of this molecule": "name",
 }
 
 
