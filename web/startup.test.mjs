@@ -15,7 +15,7 @@ export function runStartupTests(install = startupInstructions, message = STARTUP
   };
   const startup = install(options);
   assert(spoken[0] === message && spoken.length === 1, 'welcome attempted on page open');
-  assert(message.includes('Enable microphone') && message.includes('say Start'), 'guide explains startup');
+  assert(message.includes('Press space') && message.includes('Help'), 'guide explains startup');
   callbacks.onError({ error: 'not-allowed' });
   assert(hint.includes('press a key'), 'autoplay failure offers an accessible fallback');
   listeners.get('keydown')({ target: { id: 'enable' } });

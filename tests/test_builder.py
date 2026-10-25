@@ -222,6 +222,7 @@ def state(builder):
     ("methyl", "CC"), ("ethyl", "CCC"), ("hydroxyl", "CO"),
     ("methoxy", "COC"), ("aldehyde", "CC=O"),
     ("carboxylic_acid", "CC(=O)O"),
+    ("acetoxy", "CC(=O)OC"),
 ])
 def test_group_shortcuts_and_undo(group, expected):
     builder = build([("add_atom", ("C",))])

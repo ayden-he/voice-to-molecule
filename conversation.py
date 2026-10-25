@@ -10,7 +10,7 @@ class Conversation:
         self.engine = engine or CommandEngine()
         self.interpret = interpret
         self.pending = []
-        self.message = "Enable your microphone, then say Start."
+        self.message = "Enable your microphone to begin."
         self._speech_action = None
 
     @property

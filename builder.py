@@ -192,9 +192,11 @@ class Builder:
             "methoxy": [("O", 1, to_atom), ("C", 1)],
             "aldehyde": [("C", 1, to_atom), ("O", 2)],
             "carboxylic_acid": [("C", 1, to_atom), ("O", 2), ("O", 1, first)],
+            # Acetoxy: -O-C(=O)-CH3 (ester-linked acetyl).
+            "acetoxy": [("O", 1, to_atom), ("C", 1), ("O", 2), ("C", 1, first + 1)],
         }
         if not isinstance(name, str) or name not in groups:
-            return False, "Choose methyl, ethyl, hydroxyl, methoxy, aldehyde, or carboxylic acid."
+            return False, "Choose methyl, ethyl, hydroxyl, methoxy, aldehyde, carboxylic acid, or acetoxy."
         return self._compound([("add_atom", args) for args in groups[name]],
                               "Added {}.".format(name.replace("_", " ")))
 

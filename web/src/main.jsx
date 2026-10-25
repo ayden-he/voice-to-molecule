@@ -7,6 +7,16 @@ import { STARTUP_MESSAGE } from "../startup.mjs";
 
 const API = "/api"; // Vite proxies /api → http://127.0.0.1:8001
 
+// Display-only tidy-up for transcript "heard" lines: Chrome speech output often
+// lacks a leading capital and end punctuation. This affects the shown text only;
+// the raw transcript is still what gets submitted to the backend.
+function formatHeard(text) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return trimmed;
+  const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  return /[.!?]$/.test(capitalized) ? capitalized : capitalized + ".";
+}
+
 // ---------------------------------------------------------------------------
 // 3Dmol viewer component
 // ---------------------------------------------------------------------------
@@ -22,9 +32,9 @@ const CPK = {
   I:  "#940094",  // purple
 };
 const HEAVY_ELEMENTS = ["C", "O", "F", "Cl", "Br", "I"];
-const HIGHLIGHT_COLOR = "#00FFFF"; // cyan — not used by any CPK element above
+const HIGHLIGHT_COLOR = "#f2b134"; // amber-yellow, matches the Send button (--card-info)
 
-function Viewer3D({ version, currentAtom }) {
+function Viewer3D({ version, currentAtom, highlight }) {
   const containerRef = useRef(null);
   const viewerRef    = useRef(null);
   const [empty, setEmpty] = useState(true);
@@ -33,8 +43,9 @@ function Viewer3D({ version, currentAtom }) {
   useEffect(() => {
     if (!window.$3Dmol || !containerRef.current) return;
     viewerRef.current = window.$3Dmol.createViewer(containerRef.current, {
-      backgroundColor: "white",
+      backgroundColor: "#12241b", // solid dark green on-palette; never white
     });
+    viewerRef.current.setBackgroundColor(0x12241b, 1);
   }, []);
 
   // Reload the MOL block whenever version changes
@@ -45,6 +56,9 @@ function Viewer3D({ version, currentAtom }) {
       .then(r => r.status === 204 ? null : r.text())
       .then(block => {
         viewer.clear();
+        // Keep the solid dark-green background on every reload so the panel
+        // never repaints white when a molecule renders.
+        viewer.setBackgroundColor(0x12241b, 1);
         if (!block) { setEmpty(true); return; }
         setEmpty(false);
         viewer.addModel(block, "mol");
@@ -63,15 +77,19 @@ function Viewer3D({ version, currentAtom }) {
           });
         });
 
-        // Highlight the current atom in cyan.
-        // The MOL block includes explicit H atoms for 3D embedding — filter
-        // to only C and O (the only elements this app builds) so the index
-        // matches the builder's 1-based heavy-atom cursor exactly.
-        if (currentAtom != null) {
-          const heavyAtoms = viewer.getModel()
-            .selectedAtoms({ elem: HEAVY_ELEMENTS })
-            .sort((a, b) => a.serial - b.serial);
-          const target = heavyAtoms[currentAtom - 1];
+        // Highlight: during readback, the segment's atom or bond takes
+        // precedence; otherwise the builder's current atom. The MOL block has
+        // explicit H atoms, so index into heavy atoms by the 1-based number.
+        const heavyAtoms = viewer.getModel()
+          .selectedAtoms({ elem: HEAVY_ELEMENTS })
+          .sort((a, b) => a.serial - b.serial);
+        const highlightNumbers = highlight && highlight.atom != null
+          ? [highlight.atom]
+          : highlight && highlight.bond
+            ? highlight.bond
+            : (currentAtom != null ? [currentAtom] : []);
+        for (const number of highlightNumbers) {
+          const target = heavyAtoms[number - 1];
           if (target != null) {
             viewer.setStyle({ serial: target.serial }, {
               stick:  { radius: 0.18, color: HIGHLIGHT_COLOR },
@@ -82,10 +100,13 @@ function Viewer3D({ version, currentAtom }) {
 
         viewer.zoomTo();
         viewer.spin("y", 0.5);
+        // Final re-assert: addModel/setStyle can restore a default clear colour,
+        // so set the solid dark green just before render to avoid a white flash.
+        viewer.setBackgroundColor(0x12241b, 1);
         viewer.render();
       })
       .catch(() => {});
-  }, [version, currentAtom]);
+  }, [version, currentAtom, highlight]);
 
   return (
     <div className="viewer-3d-wrap">
@@ -101,15 +122,13 @@ function Viewer3D({ version, currentAtom }) {
 function MicRing({ listening, onClick, disabled }) {
   const pathRef = useRef(null);
   const frameRef = useRef(null);
+  const BASE_D = "M 60 10 A 50 50 0 1 1 59.99 10 Z";
 
   useEffect(() => {
-    if (!listening) {
-      if (frameRef.current) cancelAnimationFrame(frameRef.current);
-      if (pathRef.current)
-        pathRef.current.setAttribute("d", "M 60 10 A 50 50 0 1 1 59.99 10 Z");
-      return;
-    }
+    if (!listening) return;           // idle renders a static circle declaratively
+    let cancelled = false;
     const draw = () => {
+      if (cancelled || !pathRef.current) return;
       const t = performance.now() / 1000;
       const N = 80;
       const pts = [];
@@ -121,11 +140,14 @@ function MicRing({ listening, onClick, disabled }) {
         const r = 50 + pulse * 2 + ripple;
         pts.push(`${60 + Math.cos(a) * r},${60 + Math.sin(a) * r}`);
       }
-      pathRef.current?.setAttribute("d", `M ${pts.join(" L ")} Z`);
+      pathRef.current.setAttribute("d", `M ${pts.join(" L ")} Z`);
       frameRef.current = requestAnimationFrame(draw);
     };
-    draw();
-    return () => cancelAnimationFrame(frameRef.current);
+    frameRef.current = requestAnimationFrame(draw);
+    return () => {
+      cancelled = true;
+      if (frameRef.current) { cancelAnimationFrame(frameRef.current); frameRef.current = null; }
+    };
   }, [listening]);
 
   return (
@@ -137,19 +159,26 @@ function MicRing({ listening, onClick, disabled }) {
       id="enable"
       aria-label={listening ? "Stop microphone" : "Enable microphone"}
     >
-      <svg viewBox="0 0 120 120" aria-hidden="true">
-        {/* Pulsing outline path */}
-        <path ref={pathRef} className="ring-wave" d="M 60 10 A 50 50 0 1 1 59.99 10 Z" />
-        {/* Static ripple rings shown only when active */}
-        {listening && <>
-          <circle className="ripple r1" cx="60" cy="60" r="52" />
-          <circle className="ripple r2" cx="60" cy="60" r="52" />
-          <circle className="ripple r3" cx="60" cy="60" r="52" />
-        </>}
+      {/* Keyed on `listening` so the ring subtree remounts fresh on every
+          toggle. A stopped mic always mounts clean static SVG — no animated
+          leftover geometry (wobble path or ripple radius) can be left frozen. */}
+      <svg key={listening ? "on" : "off"} viewBox="0 0 120 120" aria-hidden="true">
+        {listening ? (
+          <>
+            {/* Live wobble path (RAF-driven) + animated ripples */}
+            <path ref={pathRef} className="ring-wave" d={BASE_D} />
+            <circle className="ripple r1" cx="60" cy="60" r="52" />
+            <circle className="ripple r2" cx="60" cy="60" r="52" />
+            <circle className="ripple r3" cx="60" cy="60" r="52" />
+          </>
+        ) : (
+          /* Idle: a single clean static ring, no animation state at all. */
+          <path className="ring-wave" d={BASE_D} />
+        )}
         {/* Inner filled circle */}
         <circle cx="60" cy="60" r="38" className="ring-fill" />
         {/* Mic icon */}
-        <g transform="translate(60,60)" fill="white">
+        <g className="mic-glyph" transform="translate(60,60)" fill="white">
           <rect x="-7" y="-17" width="14" height="20" rx="7" />
           <path d="M-12 2 a12 12 0 0 0 24 0" strokeWidth="2.5" stroke="white" fill="none" strokeLinecap="round"/>
           <line x1="0" y1="14" x2="0" y2="20" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
@@ -257,8 +286,8 @@ function MoleculeInfo({ atoms, smiles }) {
   const formula = molecularFormula(atoms);
 
   const items = [
-    formula    ? { cls: "mol-formula", text: formula }    : null,
     commonName ? { cls: "mol-name",    text: commonName } : null,
+    formula    ? { cls: "mol-formula", text: formula }    : null,
     iupacName  ? { cls: "mol-iupac",   text: iupacName }  : null,
   ].filter(Boolean);
 
@@ -301,6 +330,63 @@ function MoleculeInfo({ atoms, smiles }) {
     </div>
   );
 }
+// ---------------------------------------------------------------------------
+// Settings popout panel
+// ---------------------------------------------------------------------------
+function SettingsPanel({ open, muted, onMute, onClose }) {
+  if (!open) return null;
+  return (
+    <div className="settings-overlay" role="dialog" aria-modal="true" aria-label="Settings">
+      <div className="settings-panel">
+        <div className="settings-head">
+          <h2 className="settings-title">Settings</h2>
+          <button className="settings-close" aria-label="Close settings" onClick={onClose}>×</button>
+        </div>
+        <div className="settings-row">
+          <span className="toggle-label">Mute</span>
+          <label className="toggle">
+            <input id="spoken" type="checkbox" checked={muted} onChange={event => onMute(event.target.checked)} />
+            <span className="toggle-track" aria-hidden="true"><span className="toggle-knob" /></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Logo — an audio waveform in the shape of a hexagon.
+// A hexagon outline with vertical sound bars inside whose heights rise toward
+// the center like a waveform.
+// ---------------------------------------------------------------------------
+function Logo() {
+  // Bars across the hexagon width; heights peak in the middle (waveform).
+  const bars = [
+    { x: 14, h: 10 },
+    { x: 20, h: 20 },
+    { x: 26, h: 30 },
+    { x: 32, h: 38 },
+    { x: 38, h: 30 },
+    { x: 44, h: 20 },
+    { x: 50, h: 10 },
+  ];
+  return (
+    <svg className="logo-mark" viewBox="0 0 64 56" width="40" height="36" role="img" aria-label="ChemSpeak logo: audio waveform in a hexagon">
+      {/* hexagon outline */}
+      <polygon
+        points="32,4 56,18 56,38 32,52 8,38 8,18"
+        fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"
+      />
+      {/* waveform bars, centered vertically at y=28 */}
+      <g stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+        {bars.map(({ x, h }) => (
+          <line key={x} x1={x} y1={28 - h / 2} x2={x} y2={28 + h / 2} />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
 export default function App() {
   const [listening, setListening]     = useState(false);
   const [entries, setEntries]         = useState([]);
@@ -310,10 +396,32 @@ export default function App() {
   const [smiles, setSmiles]           = useState("");
   const [currentAtom, setCurrentAtom] = useState(null);
   const controllerRef = useRef(null);
-  const [status, setStatus] = useState("Enable your microphone, then say Start.");
+  const [status, setStatus] = useState("Enable your microphone to begin.");
   const [mode, setMode] = useState("off");
   const [typed, setTyped] = useState("");
   const [muted, setMuted] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Readback highlight: {atom:n} | {bond:[a,b]} | null. Drives 2D + 3D sync.
+  const [highlight, setHighlight] = useState(null);
+
+  // Settings announcement uses the browser speech channel directly so it does
+  // not depend on the controller's internal speak(). X/close cancels any speech.
+  const openSettings = useCallback(() => {
+    setSettingsOpen(true);
+    if (!muted && window.speechSynthesis && window.SpeechSynthesisUtterance) {
+      const text = "Settings. Mute toggle, currently off.";
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(", " + text);
+      u.rate = 1.5;
+      window.speechSynthesis.speak(u);
+      window.speechSynthesis.resume?.();
+    }
+  }, [muted]);
+
+  const closeSettings = useCallback(() => {
+    window.speechSynthesis?.cancel();
+    setSettingsOpen(false);
+  }, []);
 
   const addEntry = useCallback((type, text) => {
     setEntries(prev => [...prev, { type, text }]);
@@ -331,9 +439,11 @@ export default function App() {
     const controller = createBrowserController({
       env: window, api: API,
       onState: applyState,
-      onHeard: text => addEntry("heard", text),
+      onHeard: text => addEntry("heard", formatHeard(text)),
       onMessage: text => addEntry("action", text),
       onStatus: setStatus, onListening: setListening, onMode: setMode,
+      onMute: setMuted,
+      onHighlight: setHighlight,
     });
     controllerRef.current = controller;
     let mounted = true;
@@ -363,41 +473,67 @@ export default function App() {
 
   const hasSR = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
+  // During a readback highlight, show the live highlighted SVG for that
+  // atom/bond; otherwise show the normal current-molecule image.
+  let displayUrl = moleculeUrl;
+  if (highlight && moleculeUrl) {
+    const sep = moleculeUrl.includes("?") ? "&" : "?";
+    if (highlight.atom != null) displayUrl = `${moleculeUrl}${sep}atom=${highlight.atom}`;
+    else if (highlight.bond) displayUrl = `${moleculeUrl}${sep}bond=${highlight.bond.join(",")}`;
+  }
+
   return (
-    <div className="app">
-      {/* LEFT COLUMN */}
-      <div className="col-left">
-        <div className="panel top">
-          <div className="voice-controls">
-            <MicRing listening={listening} onClick={toggleMic} disabled={!hasSR} />
-            <span>{listening ? `Microphone on: ${mode}` : "Enable microphone"}</span>
-            <p id="voice-status" role="status">{status}</p>
+    <div className="app-shell">
+      {/* TOP BAR */}
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-logos" aria-hidden="false">
+            <Logo />
+          </span>
+          <span className="brand-name">ChemSpeak</span>
+        </div>
+        <button className="settings-btn" aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={openSettings}>
+          Settings
+        </button>
+      </header>
+
+      <SettingsPanel
+        open={settingsOpen}
+        muted={muted}
+        onMute={value => { controllerRef.current?.mute(value); }}
+        onClose={closeSettings}
+      />
+
+      <div className="app">
+        {/* LEFT COLUMN — single tab: mic + status, scrolling transcript, typed input pinned bottom */}
+        <div className="col-left">
+          <div className="rail-top">
+            <MicRing listening={listening && mode !== "off"} onClick={toggleMic} disabled={!hasSR} />
+            <span className="rail-mode">{listening ? `Microphone on: ${mode}` : "Enable microphone"}</span>
+            <p id="voice-status" className="rail-status" role="status">{status}</p>
             <p className="sr-only" id="startup-instructions">{STARTUP_MESSAGE}</p>
-            <button id="welcome" aria-describedby="startup-instructions" onClick={() => controllerRef.current?.replay()}>
-              Hear startup instructions
-            </button>
-            <label>
-              <input id="spoken" type="checkbox" checked={!muted} onChange={event => {
-                const value = !event.target.checked;
-                setMuted(value); controllerRef.current?.mute(value);
-              }} /> Speak feedback
-            </label>
-            <form onSubmit={event => {
-              event.preventDefault(); controllerRef.current?.type(typed); setTyped("");
-            }}>
-              <label htmlFor="text">Type a request or control word</label>
+            <p className="rail-hint">Lost? Try saying 'Help'!</p>
+          </div>
+
+          <div className="rail-transcript">
+            <TranscriptLog entries={entries} />
+          </div>
+
+          <form
+            className="rail-typed"
+            onSubmit={event => { event.preventDefault(); controllerRef.current?.type(typed); setTyped(""); }}
+          >
+            <label htmlFor="text">Type a request or control word</label>
+            <div className="rail-typed-row">
               <input id="text" value={typed} onChange={event => setTyped(event.target.value)} />
               <button type="submit">Send</button>
-            </form>
-          </div>
+            </div>
+          </form>
         </div>
-        <div className="panel bottom">
-          <TranscriptLog entries={entries} />
-        </div>
-      </div>
 
       {/* CENTER COLUMN */}
       <div className="col-center">
+        <div className="molecule-card">
         <AnimatePresence mode="wait">
           {(moleculeUrl && atoms.length > 0)
             ? (
@@ -409,7 +545,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.25, ease: "easeInOut" }}
               >
-                <img className="molecule-img" src={moleculeUrl} alt="Current molecule structure" />
+                <img className="molecule-img" src={displayUrl} alt="Current molecule structure" />
               </motion.div>
             )
             : (
@@ -421,21 +557,23 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
               >
-                Enable microphone or press space,<br/>then say Start and add carbon
+                Enable your microphone by clicking<br/>the icon or hitting space!
               </motion.span>
             )
           }
         </AnimatePresence>
+        </div>
       </div>
 
       {/* RIGHT COLUMN */}
       <div className="col-right">
         <div className="panel top">
-          <Viewer3D version={version} currentAtom={currentAtom} />
+          <Viewer3D version={version} currentAtom={currentAtom} highlight={highlight} />
         </div>
         <div className="panel bottom">
           <MoleculeInfo atoms={atoms} smiles={smiles} />
         </div>
+      </div>
       </div>
     </div>
   );

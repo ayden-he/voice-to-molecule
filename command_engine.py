@@ -8,8 +8,37 @@ import library
 import naming
 from builder import Builder, ELEMENT_NAMES, UNSUPPORTED_ELEMENT_MESSAGE
 from parser import parse
-from readback import detail, summary
+from readback import detail, detail_segments, summary
 from main import HELP_TEXT, OPTIONS_TEXT
+
+
+WHITE = (1.0, 1.0, 1.0, 1.0)
+
+# CPK element colours (RGB) for the elements this app places. Carbon and
+# hydrogen are kept white so bonds and the skeleton read on the dark card;
+# heteroatoms keep their standard CPK colours for quick recognition.
+_CPK_PALETTE = {
+    -1: WHITE,                      # default (covers carbon and anything else)
+    1:  (1.00, 1.00, 1.00),         # H  white
+    6:  (1.00, 1.00, 1.00),         # C  white (visible on dark green)
+    8:  (1.00, 0.20, 0.20),         # O  red
+    9:  (0.56, 0.88, 0.31),         # F  green
+    17: (0.12, 0.94, 0.12),         # Cl green
+    35: (0.80, 0.33, 0.20),         # Br orange-brown
+    53: (0.62, 0.21, 0.62),         # I  purple
+}
+
+
+def _white_drawing(options):
+    """Draw on the dark structure card: white carbon/bonds/numbers with CPK
+    colours for heteroatoms, on a transparent background."""
+    options.setAtomPalette(_CPK_PALETTE)  # CPK symbols; carbon/default white
+    options.setAnnotationColour(WHITE)    # the 1-based atom numbers
+    options.setAtomNoteColour(WHITE)
+    options.setBondNoteColour(WHITE)
+    options.clearBackground = False       # keep transparent; card shows through
+    return options
+
 
 ELEMENT_MESSAGE = UNSUPPORTED_ELEMENT_MESSAGE
 UNKNOWN_MESSAGE = ("I didn't understand that. "
@@ -28,6 +57,7 @@ class CommandEngine:
             "smiles": self.builder.smiles() or "",
             "summary": summary(self.builder),
             "detail": detail(self.builder),
+            "readback_segments": detail_segments(self.builder),
             "current_atom": self.builder.current_atom,
             "atoms": atoms,
             "image_url": "/image?v={}".format(self.version),
@@ -121,19 +151,49 @@ class CommandEngine:
         # parse() only returns known actions, so this is defensive.
         return False, UNKNOWN_MESSAGE
 
-    def svg(self) -> Optional[str]:
-        """Draw the current molecule as numbered SVG, or None when empty."""
+    def svg(self, highlight_atom=None, highlight_bond=None) -> Optional[str]:
+        """Draw the current molecule as numbered SVG, or None when empty.
+
+        During readback, highlight_atom (1-based) or highlight_bond ([a, b],
+        1-based) override the default current-atom highlight so the drawing can
+        follow the spoken description one atom/bond at a time.
+        """
         molecule = self.builder.molecule_copy()
         if molecule.GetNumAtoms() == 0:
             return None
         for atom in molecule.GetAtoms():
             atom.SetProp("atomNote", str(atom.GetIdx() + 1))
-        highlighted = ([] if self.builder.current_atom is None
-                       else [self.builder.current_atom - 1])
+        amber = (0.949, 0.694, 0.204, 1.0)
+        n = molecule.GetNumAtoms()
+        highlight_atoms = []
+        highlight_bonds = []
+        atom_colors = {}
+        bond_colors = {}
+        if highlight_bond is not None:
+            a, b = highlight_bond
+            bond = molecule.GetBondBetweenAtoms(a - 1, b - 1)
+            if bond is not None:
+                highlight_bonds = [bond.GetIdx()]
+                bond_colors = {bond.GetIdx(): amber}
+                # Also highlight the two endpoint atoms for clarity.
+                highlight_atoms = [i - 1 for i in (a, b) if 1 <= i <= n]
+                atom_colors = {i: amber for i in highlight_atoms}
+        elif highlight_atom is not None:
+            if 1 <= highlight_atom <= n:
+                highlight_atoms = [highlight_atom - 1]
+                atom_colors = {highlight_atom - 1: amber}
+        else:
+            # Default: the builder's current atom.
+            if self.builder.current_atom is not None:
+                idx = self.builder.current_atom - 1
+                highlight_atoms = [idx]
+                atom_colors = {idx: amber}
         drawer = rdMolDraw2D.MolDraw2DSVG(600, 450)
+        _white_drawing(drawer.drawOptions())
         rdMolDraw2D.PrepareAndDrawMolecule(
-            drawer, molecule, highlightAtoms=highlighted,
-            highlightAtomColors={i: (0.0, 1.0, 1.0) for i in highlighted},
+            drawer, molecule,
+            highlightAtoms=highlight_atoms, highlightAtomColors=atom_colors,
+            highlightBonds=highlight_bonds, highlightBondColors=bond_colors,
         )
         drawer.FinishDrawing()
         return drawer.GetDrawingText()

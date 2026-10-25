@@ -86,6 +86,7 @@ def test_unrecognized_inputs(text):
     ("add methoxy", {"action": "add_group", "name": "methoxy"}),
     ("add aldehyde", {"action": "add_group", "name": "aldehyde"}),
     ("add carboxylic acid", {"action": "add_group", "name": "carboxylic_acid"}),
+    ("add acetoxy", {"action": "add_group", "name": "acetoxy"}),
     ("add benzene ring", {"action": "add_ring", "kind": "benzene"}),
     ("add cyclohexane", {"action": "add_ring", "kind": "cyclohexane"}),
     ("bond atom six to atom one", {"action": "connect", "a": 6, "b": 1, "bond_order": 1}),

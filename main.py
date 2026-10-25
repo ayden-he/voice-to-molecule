@@ -14,7 +14,7 @@ from readback import detail, summary
 
 OPTIONS_TEXT = """Elements: carbon, oxygen, and the halogens fluorine, chlorine,
 bromine, and iodine. Hydrogens are added automatically.
-Groups: methyl, ethyl, hydroxyl, methoxy, aldehyde, carboxylic acid.
+Groups: methyl, ethyl, hydroxyl, methoxy, aldehyde, carboxylic acid, acetoxy.
 Rings: cyclopropane, cyclobutane, cyclopentane, cyclohexane, benzene."""
 
 HELP_TEXT = """You build molecules from carbon, oxygen, and the halogens

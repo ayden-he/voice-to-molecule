@@ -17,7 +17,7 @@ for _word, _value in list(_NUMBERS.items()):
     if 1 <= _value <= 9 and _word not in {"to", "too", "for", "fore", "won", "ate"}:
         _NUMBERS["twenty " + _word] = 20 + _value
 
-_GROUPS = {"methyl", "ethyl", "hydroxyl", "methoxy", "aldehyde", "carboxylic acid"}
+_GROUPS = {"methyl", "ethyl", "hydroxyl", "methoxy", "aldehyde", "carboxylic acid", "acetoxy"}
 _RINGS = {"cyclopropane", "cyclobutane", "cyclopentane", "cyclohexane", "benzene"}
 # Supported elements the user can place: spoken name -> RDKit symbol. Carbon and
 # oxygen plus the halogens. Hydrogens are always implicit and never placed.

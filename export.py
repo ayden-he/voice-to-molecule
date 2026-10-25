@@ -11,6 +11,9 @@ from rdkit.Chem.Draw import rdMolDraw2D
 from builder import Builder
 
 
+WHITE = (1.0, 1.0, 1.0, 1.0)
+
+
 CURRENT_IMAGE = Path("outputs/current.png")
 PLATFORM = sys.platform
 
@@ -39,9 +42,18 @@ def save_image(builder: Builder, path: Union[str, Path]) -> Tuple[bool, str]:
             atom.SetProp("atomNote", str(atom.GetIdx() + 1))
         highlighted = [] if builder.current_atom is None else [builder.current_atom - 1]
         drawer = rdMolDraw2D.MolDraw2DCairo(800, 600)
+        options = drawer.drawOptions()
+        # CPK symbols with white carbon/bonds so they read on the dark backdrop.
+        options.setAtomPalette({
+            -1: WHITE, 1: (1.0, 1.0, 1.0), 6: (1.0, 1.0, 1.0),
+            8: (1.0, 0.2, 0.2), 9: (0.56, 0.88, 0.31), 17: (0.12, 0.94, 0.12),
+            35: (0.8, 0.33, 0.2), 53: (0.62, 0.21, 0.62),
+        })
+        options.annotationColour = WHITE          # white atom numbers
+        options.setBackgroundColour((0.11, 0.30, 0.20, 1.0))  # dark green so white reads
         rdMolDraw2D.PrepareAndDrawMolecule(
             drawer, molecule, highlightAtoms=highlighted,
-            highlightAtomColors={index: (1.0, 0.8, 0.3) for index in highlighted},
+            highlightAtomColors={index: (0.949, 0.694, 0.204, 1.0) for index in highlighted},
         )
         drawer.FinishDrawing()
         destination.write_bytes(drawer.GetDrawingText())

@@ -6,7 +6,7 @@ import re
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from main import HELP_TEXT
+from main import HELP_TEXT, OPTIONS_TEXT
 from builder import ELEMENT_NAMES
 from parser import parse
 
@@ -48,7 +48,7 @@ this molecule called", "tell me its name", and "can you identify this compound".
 Each maps directly to command "name" with an empty question. The molecule to
 identify is the current molecule; do not ask which one. Its name comes from the
 backend lookup, never from your own chemistry knowledge.
-Supported elements: """ + ", ".join(ELEMENT_NAMES.values()) + ".\nSupported vocabulary:\n" + HELP_TEXT
+Supported elements: """ + ", ".join(ELEMENT_NAMES.values()) + ".\nSupported vocabulary:\n" + HELP_TEXT + "\n" + OPTIONS_TEXT
 
 
 class InterpretationError(Exception):

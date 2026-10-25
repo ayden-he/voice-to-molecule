@@ -8,6 +8,7 @@ from pathlib import Path
 import threading
 import socket
 import mimetypes
+import urllib.parse
 
 from conversation import Conversation
 from interpreter import GeminiInterpreter
@@ -49,6 +50,7 @@ def make_server(port=8001, interpret=None):
 
         def do_GET(self):
             path = self.path.split("?", 1)[0]
+            query = urllib.parse.parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
             if path.startswith('/api/'):
                 path = path[4:]
             if path == "/health":
@@ -63,7 +65,20 @@ def make_server(port=8001, interpret=None):
                         body = json.dumps(snapshot["state"])
                         ct = "application/json"
                     elif path == "/image":
-                        body = snapshot["image"]
+                        # Readback highlight: ?atom=N or ?bond=a,b renders a live
+                        # SVG highlighting that atom/bond. Otherwise use the cache.
+                        atom = bond = None
+                        if "atom" in query:
+                            try: atom = int(query["atom"][0])
+                            except (ValueError, IndexError): atom = None
+                        if "bond" in query:
+                            try: bond = [int(x) for x in query["bond"][0].split(",")[:2]]
+                            except (ValueError, IndexError): bond = None
+                        if atom is not None or bond is not None:
+                            live = conversation.engine.svg(highlight_atom=atom, highlight_bond=bond)
+                            body = live if live is not None else snapshot["image"]
+                        else:
+                            body = snapshot["image"]
                         ct = "image/svg+xml"
                     else:
                         block = conversation.engine.structure_3d()

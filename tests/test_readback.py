@@ -23,8 +23,8 @@ def test_single_carbon():
     builder = molecule([("C", 1)])
     assert summary(builder) == "1 carbon and 4 hydrogens."
     assert detail(builder) == (
-        "Atom 1, carbon, with 4 hydrogens, not bonded to anything yet. "
-        "The current atom is atom 1, carbon."
+        "The current atom is atom 1, carbon. "
+        "Atom 1, carbon, with 4 hydrogens, not bonded to anything yet."
     )
 
 
@@ -32,11 +32,10 @@ def test_ethanol():
     builder = molecule([("C", 1), ("C", 1), ("O", 1)])
     assert summary(builder) == "2 carbons, 1 oxygen, and 6 hydrogens."
     assert detail(builder) == (
+        "The current atom is atom 3, oxygen. "
         "Atom 1, carbon, with 3 hydrogens, bonded to atom 2 by a single bond. "
-        "Atom 2, carbon, with 2 hydrogens, bonded to atom 1 by a single bond "
-        "and to atom 3 by a single bond. "
-        "Atom 3, oxygen, with 1 hydrogen, bonded to atom 2 by a single bond. "
-        "The current atom is atom 3, oxygen."
+        "Atom 2, carbon, with 2 hydrogens, bonded to atom 3 by a single bond. "
+        "Atom 3, oxygen, with 1 hydrogen."
     )
 
 
@@ -46,18 +45,18 @@ def test_acetone():
     assert builder.add_atom("O", 2)[0]
     assert summary(builder) == "3 carbons, 1 oxygen, and 6 hydrogens."
     assert detail(builder) == (
+        "The current atom is atom 4, oxygen. "
         "Atom 1, carbon, with 3 hydrogens, bonded to atom 2 by a single bond. "
-        "Atom 2, carbon, with no hydrogens, bonded to atom 1 by a single bond, "
-        "to atom 3 by a single bond, and to atom 4 by a double bond. "
-        "Atom 3, carbon, with 3 hydrogens, bonded to atom 2 by a single bond. "
-        "Atom 4, oxygen, with no hydrogens, bonded to atom 2 by a double bond. "
-        "The current atom is atom 4, oxygen."
+        "Atom 2, carbon, with no hydrogens, bonded to atom 3 by a single bond "
+        "and to atom 4 by a double bond. "
+        "Atom 3, carbon, with 3 hydrogens. "
+        "Atom 4, oxygen, with no hydrogens."
     )
     # Cursor moves and undo must be reflected without changing atom order.
     assert builder.go_to(1)[0]
-    assert detail(builder).endswith("The current atom is atom 1, carbon.")
+    assert detail(builder).startswith("The current atom is atom 1, carbon.")
     assert builder.undo()[0]
-    assert detail(builder).endswith("The current atom is atom 4, oxygen.")
+    assert detail(builder).startswith("The current atom is atom 4, oxygen.")
 
 
 @pytest.mark.parametrize("order, word, middle_hydrogens, last_hydrogens, total", [
@@ -68,12 +67,11 @@ def test_propene_and_propyne(order, word, middle_hydrogens, last_hydrogens, tota
     builder = molecule([("C", 1), ("C", 1), ("C", order)])
     assert summary(builder) == "3 carbons and {} hydrogens.".format(total)
     assert detail(builder) == (
+        "The current atom is atom 3, carbon. "
         "Atom 1, carbon, with 3 hydrogens, bonded to atom 2 by a single bond. "
-        "Atom 2, carbon, with {}, bonded to atom 1 by a single bond "
-        "and to atom 3 by a {} bond. "
-        "Atom 3, carbon, with {}, bonded to atom 2 by a {} bond. "
-        "The current atom is atom 3, carbon."
-    ).format(middle_hydrogens, word, last_hydrogens, word)
+        "Atom 2, carbon, with {}, bonded to atom 3 by a {} bond. "
+        "Atom 3, carbon, with {}."
+    ).format(middle_hydrogens, word, last_hydrogens)
 
 
 def test_singular_and_plural_oxygen():
@@ -82,7 +80,7 @@ def test_singular_and_plural_oxygen():
     assert builder.add_atom("O")[0]
     assert summary(builder) == "2 oxygens and 2 hydrogens."
     assert detail(builder) == (
+        "The current atom is atom 2, oxygen. "
         "Atom 1, oxygen, with 1 hydrogen, bonded to atom 2 by a single bond. "
-        "Atom 2, oxygen, with 1 hydrogen, bonded to atom 1 by a single bond. "
-        "The current atom is atom 2, oxygen."
+        "Atom 2, oxygen, with 1 hydrogen."
     )

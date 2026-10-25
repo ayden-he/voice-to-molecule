@@ -5,7 +5,7 @@ export function createSession({ submit, stopSpeech, status, changed = () => {} }
   let generation = 0;
   function discardFollowing() { generation++; }
   function setMode(value) { mode = value; changed(mode); }
-  function enabled() { setMode('paused'); status('Microphone enabled. Say Start to begin.'); }
+  function enabled() { setMode('active'); status('Microphone on. Speak a command.'); }
   function stopped() { setMode('off'); status('Microphone off. Use Enable microphone to restart.'); }
   function receive(text) {
     const control = text.toLowerCase().trim().replace(/[.!?,]+$/g, '');

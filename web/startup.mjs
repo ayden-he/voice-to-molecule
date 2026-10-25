@@ -1,4 +1,4 @@
-export const STARTUP_MESSAGE = 'Welcome to Voice to Molecule. To begin, activate the Enable microphone button and allow microphone access if asked. Then say Start. Say a command such as add carbon. Say Pause to pause commands, Start to resume, Undo to reverse your last command, or Stop to turn the microphone off. You can also type requests in the text box.';
+export const STARTUP_MESSAGE = 'Press space or click the microphone to begin transcribing. Use Help to see available commands.';
 
 // Browsers may reject page-load speech; retry only after a real interaction.
 export function startupInstructions({ speak, listen, unlisten, hint }) {

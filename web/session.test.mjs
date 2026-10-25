@@ -11,9 +11,7 @@ export async function runSessionTests(create = createSession) {
     stopSpeech: () => { interrupted++; }, status() {},
   });
   session.enabled();
-  session.receive('undo');
-  assert(submitted.length === 0, 'undo ignored while paused');
-  session.receive('Start');
+  assert(session.mode() === 'active', 'enabling the mic activates commands without Start');
   session.receive('carbon');
   session.receive('undo');
   await Promise.resolve();
