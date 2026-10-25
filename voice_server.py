@@ -53,10 +53,22 @@ def make_server(port=8001, interpret=None):
                     "api_key_configured": bool(os.environ.get("GEMINI_API_KEY")),
                 }))
                 return
-            if path in ("/state", "/image"):
+            if path in ("/state", "/image", "/structure3d"):
                 with snapshot_lock:
-                    body = json.dumps(snapshot["state"]) if path == "/state" else snapshot["image"]
-                self.send(200, body, "application/json" if path == "/state" else "image/svg+xml")
+                    if path == "/state":
+                        body = json.dumps(snapshot["state"])
+                        ct = "application/json"
+                    elif path == "/image":
+                        body = snapshot["image"]
+                        ct = "image/svg+xml"
+                    else:
+                        block = conversation.engine.structure_3d()
+                        if block is None:
+                            self.send(204, b"")
+                            return
+                        body = block
+                        ct = "chemical/x-mdl-molfile"
+                self.send(200, body, ct)
                 return
             files = {"/": "voice-app.html", "/voice-app.html": "voice-app.html",
                      "/voice-app.mjs": "voice-app.mjs", "/session.mjs": "session.mjs"}
