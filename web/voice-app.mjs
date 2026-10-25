@@ -45,6 +45,7 @@ async function submit(text) {
     while ((boundary = buffer.indexOf('\n')) !== -1) {
       const event = JSON.parse(buffer.slice(0, boundary));
       buffer = buffer.slice(boundary + 1);
+      if (event.discard_following) session.discardFollowing();
       render(event);
       if (event.speech_action === 'stop') stopSpeech();
       else say(event.message);

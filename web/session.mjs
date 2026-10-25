@@ -2,6 +2,8 @@
 export function createSession({ submit, stopSpeech, status, changed = () => {} }) {
   let mode = 'off';
   let tail = Promise.resolve();
+  let generation = 0;
+  function discardFollowing() { generation++; }
   function setMode(value) { mode = value; changed(mode); }
   function enabled() { setMode('paused'); status('Microphone enabled. Say Start to begin.'); }
   function stopped() { setMode('off'); status('Microphone off. Use Enable microphone to restart.'); }
@@ -17,10 +19,15 @@ export function createSession({ submit, stopSpeech, status, changed = () => {} }
     }
     if (control === 'undo') stopSpeech();
     // Preserve spoken order, including undo, while earlier AI requests finish.
-    tail = tail.then(() => submit(text)).catch(() => {
+    const acceptedGeneration = generation;
+    tail = tail.then(() => {
+      if (acceptedGeneration !== generation) return;
+      return submit(text);
+    }).catch(() => {
+      discardFollowing();
       setMode('paused');
       status('Connection lost. Paused; check the molecule before retrying.');
     });
   }
-  return { enabled, stopped, receive, mode: () => mode, settled: () => tail };
+  return { enabled, stopped, receive, discardFollowing, mode: () => mode, settled: () => tail };
 }

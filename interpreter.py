@@ -36,7 +36,7 @@ Use the supplied molecule state to resolve explicit references only when clear.
 Split 'add two carbons' into two add carbon steps so each atom addition can be
 undone individually. Never output start/pause/stop/quit, save, or show commands.
 If given an unresolved request and clarification, resolve only that request;
-later queued requests are managed by the application, not by you.
+instructions after the ambiguous part were discarded. Never reconstruct them.
 Use 'build NAME' only for a named-molecule library request; do not invent SMILES.
 Use 'name' for a molecule-name lookup. Skip stops feedback, not the microphone.
 Supported elements: """ + ", ".join(ELEMENT_NAMES.values()) + ".\nSupported vocabulary:\n" + HELP_TEXT
@@ -118,9 +118,9 @@ class GeminiInterpreter:
             }
             raise InterpretationError("Gemini HTTP {}. ".format(exc.code) +
                                       messages.get(exc.code, "Gemini request failed.") + diagnostic +
-                                      " Your request is held; no automatic retry was made.") from exc
+                                      " No commands from this request were applied; no automatic retry was made.") from exc
         except Exception as exc:
-            raise InterpretationError("Gemini interpretation failed. Your request is held; try again.") from exc
+            raise InterpretationError("Gemini interpretation failed. No commands from this request were applied; try again.") from exc
 
 
 def validate_plan(plan):

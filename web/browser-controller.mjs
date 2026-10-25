@@ -38,6 +38,7 @@ export function createBrowserController({
   }
   function showEvent(event) {
     if (disposed) return;
+    if (event.discard_following) session.discardFollowing();
     onState(event);
     if (event.message) onMessage(event.message);
     if (event.speech_action === 'stop') stopSpeech();

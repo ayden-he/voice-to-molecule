@@ -48,15 +48,17 @@ do not run both expecting a shared molecule. Main's named-molecule library,
 name lookup, and halogen edits are supported through the shared engine.
 
 Gemini translates finalized speech segments, which can contain several actions.
-The app executes clear steps until the first ambiguity, explains what is queued,
-and waits for clarification. It never commits changing interim transcripts, so
+The app executes clear steps until the first ambiguity, discards everything
+after it, and asks for clarification. Later instructions must be spoken again;
+there is no backlog. It never commits changing interim transcripts, so
 update timing depends on Chrome finalizing a speech segment and API latency.
 The API key stays on the server. The default model is `gemini-3.5-flash-lite`;
 optionally set `GEMINI_MODEL` to a compatible Gemini model you can access.
 Create your key in https://aistudio.google.com/apikey. Your reported free quota
 is 15 requests/minute, 250K tokens/minute, and 500 requests/day; limits are
-project-specific and can change. A limit error holds the request without
-automatic retries or molecule changes. Clarification may require extra calls.
+project-specific and can change. A limit error discards the unexecuted request
+without automatic retries or molecule changes. Repeat it after the limit clears.
+Clarification may require extra calls.
 Google's free-tier content may be used to improve its products.
 
 Run backend checks with `python -m pytest tests/test_conversation.py` and

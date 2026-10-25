@@ -22,7 +22,8 @@ class Conversation:
 
     def state(self):
         return dict(self.engine.snapshot(), message=self.message,
-                    version=self.version, queued=[step["source"] for step in self.pending])
+                    version=self.version, queued=[],
+                    clarification=self.pending[0]["question"] if self.pending else "")
 
     def image(self):
         return self.engine.svg() or ('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">'
@@ -45,18 +46,15 @@ class Conversation:
             self.message += " Pending voice instructions remain held for clarification."
         return dict(result, **{key: value for key, value in self.state().items()})
 
-    def queued_message(self):
-        if not self.pending:
-            return ""
-        later = [step["source"] for step in self.pending[1:]]
-        return " Later instructions are queued and will run after clarification: {}.".format("; ".join(later)) if later else ""
+    def clarification_message(self, question):
+        return question + " Later instructions were discarded. Please repeat any you still want after clarifying."
 
     def accept(self, text, emit=lambda event: None):
         """Caller serializes requests. Every completed action emits its own state."""
         events = []
-        def report(ok, message):
+        def report(ok, message, discard_following=False):
             self.message = message
-            event = dict(self.state(), ok=ok)
+            event = dict(self.state(), ok=ok, discard_following=discard_following)
             if self._speech_action:
                 event["speech_action"] = self._speech_action
                 self._speech_action = None
@@ -82,39 +80,25 @@ class Conversation:
             # Injected/mock interpreters must meet the same contract.
             validate_plan({"steps": steps})
         except (InterpretationError, ValueError) as exc:
-            if not self.pending:
-                self.pending = [{"source": text, "command": "", "question": "Please clarify or repeat this request."}]
-            report(False, str(exc) + self.queued_message())
+            # No trustworthy boundary exists, so do not retain the whole request.
+            self.pending = []
+            report(False, str(exc) + " Please repeat the instruction you want to try.", True)
             return events
-        if self.pending:
-            # Interpret dependent instructions against the clarified, updated
-            # molecule rather than trusting a plan made before the barrier.
-            for step in self.pending[1:]:
-                step["command"] = ""
-                step["question"] = "__reinterpret__"
-            self.pending[0:1] = steps
-        else:
-            self.pending = steps
+        # A clarification can replace only the confusing statement; its former
+        # tail has already been forgotten and can never reappear here.
+        self.pending = steps
         while self.pending:
             step = self.pending[0]
-            if step["question"] == "__reinterpret__":
-                try:
-                    following = self.interpret(step["source"], self.state())
-                    validate_plan({"steps": following})
-                except (InterpretationError, ValueError):
-                    step["question"] = "Please clarify: " + step["source"]
-                    report(False, step["question"] + self.queued_message())
-                    break
-                self.pending[0:1] = following
-                continue
             if not step["command"]:
-                report(False, step["question"] + self.queued_message())
+                self.pending = [step]
+                report(False, self.clarification_message(step["question"]), True)
                 break
             ok, message = self.execute(step["command"])
             if not ok:
                 step["command"] = ""
                 step["question"] = message + " How would you like to change this instruction?"
-                report(False, step["question"] + self.queued_message())
+                self.pending = [step]
+                report(False, self.clarification_message(step["question"]), True)
                 break
             self.pending.pop(0)
             report(True, message)

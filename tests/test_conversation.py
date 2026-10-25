@@ -14,45 +14,50 @@ def step(source, command="", question=""):
     return dict(source=source, command=command, question=question)
 
 
-def test_clarification_holds_tail_and_announces_it():
+def test_clarification_discards_tail_and_announces_it():
     responses = iter([
         [step("carbon", "add carbon"), step("that group", question="Which group?"),
          step("add oxygen", "add oxygen")],
         [step("methyl", "add methyl")],
-        [step("add oxygen", "add oxygen")],
     ])
     session = Conversation(lambda *_: next(responses))
     events = session.accept("carbon, that group, oxygen")
     assert len(session.builder.describe_atoms()) == 1
-    assert "add oxygen" in events[-1]["message"]
-    assert "queued" in events[-1]["message"]
+    assert "discarded" in events[-1]["message"]
+    assert events[-1]['queued'] == []
+    assert events[-1]['discard_following'] is True
+    assert len(session.pending) == 1
+    assert session.pending[0]['source'] == 'that group'
     events = session.accept("methyl")
-    assert len(events) == 2
-    assert session.builder.smiles() == "CCO"
-    session.accept("undo")
+    assert len(events) == 1
     assert session.builder.smiles() == "CC"
+    session.accept("undo")
+    assert session.builder.smiles() == "C"
 
 
 def test_rejected_edit_blocks_following_actions():
     session = Conversation(lambda *_: [step("oxygen", "add oxygen"),
-        step("another oxygen", "add oxygen double bond"), step("carbon", "add carbon")])
+        step("another oxygen", "add oxygen double bond"), step("carbon", "add carbon"),
+        step("later carbon", "add carbon to atom 1")])
     events = session.accept("build")
     assert len(events) == 3
     assert not events[-1]["ok"]
     assert session.builder.smiles() == "O=O"
     assert len(session.pending) == 1
+    assert events[-1]['discard_following'] is True
+    assert events[-1]['queued'] == []
 
 
-def test_model_failure_preserves_request_and_state():
+def test_model_failure_discards_request_and_preserves_state():
     def fail(*_):
         raise InterpretationError("service failed")
     session = Conversation(fail)
     session.accept("add a carbon")
     assert session.builder.smiles() == ""
-    assert session.pending[0]["source"] == "add a carbon"
+    assert session.pending == []
 
 
-def test_queued_reference_reinterpreted_after_clarification():
+def test_discarded_reference_never_reinterpreted_after_clarification():
     calls = []
     def interpret(text, state):
         calls.append((text, len(state["atoms"])))
@@ -61,13 +66,12 @@ def test_queued_reference_reinterpreted_after_clarification():
                     step("oxygen on the new atom", "add oxygen to atom 1")]
         if len(calls) == 2:
             return [step("ethyl", "add ethyl")]
-        assert len(state["atoms"]) == 2
-        return [step("oxygen on the new atom", "add oxygen to atom 2")]
+        raise AssertionError('Discarded oxygen must never be reinterpreted')
     session = Conversation(interpret)
     session.accept("that group then oxygen on the new atom")
     session.accept("ethyl")
-    assert session.builder.smiles() == "CCO"
-    assert calls[-1] == ("oxygen on the new atom", 2)
+    assert session.builder.smiles() == "CC"
+    assert len(calls) == 2
 
 
 @pytest.mark.parametrize("bad", [
@@ -122,7 +126,7 @@ def test_gemini_rate_limit_holds_request_without_retry(monkeypatch):
     events = session.accept('add a carbon')
     assert len(calls) == 1
     assert session.builder.smiles() == ''
-    assert session.pending[0]['source'] == 'add a carbon'
+    assert session.pending == []
     assert 'usage limit' in events[-1]['message']
 
 

@@ -105,6 +105,21 @@ export async function runControllerTests(create = createBrowserController) {
   stale.onend();
   assert(timers.size === 0 && listeners.size === 0, 'unmount releases microphone, speech, and startup listeners');
   assert(restarted >= 2 && statuses.length > 0, 'recognition and status callbacks exercised');
+  const posted = [];
+  const second = create({ env: { ...env, fetch: async (_url, options) => {
+    posted.push(JSON.parse(options.body).text);
+    let done = false;
+    return { ok: true, body: { getReader: () => ({ read: async () => {
+      if (done) return { done: true };
+      done = true;
+      return { done: false, value: new TextEncoder().encode(
+        JSON.stringify({ message: 'Which group? Later instructions were discarded.', discard_following: true }) + '\n') };
+    } }) } };
+  } } });
+  second.type('unclear'); second.type('oxygen');
+  await second.settled();
+  assert(posted.join() === 'unclear', 'backend discard signal clears waiting React requests');
+  second.dispose();
   return `${checks} React voice controller checks passed`;
 }
 

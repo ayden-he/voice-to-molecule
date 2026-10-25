@@ -30,11 +30,12 @@ overrides the default `gemini-3.5-flash-lite`. No Python SDK dependency is requi
 The interpreter uses Gemini generateContent with JSON Schema output and sends
 the key in the `x-goog-api-key` header, never the browser or URL. Non-STOP,
 blocked, malformed, and invalid-command responses execute no steps. Quota
-errors retain the request for clarification/retry without automatic API retries.
+errors discard the unexecuted request without automatic API retries.
 
 `POST /utterance` accepts `{ "text": "add a carbon then an oxygen" }`.
 It returns `application/x-ndjson`: one complete state event per executed action
-or clarification barrier, each with `ok`, `message`, `queued`, `version`, and
+or clarification barrier, each with `ok`, `message`, `queued`, `clarification`,
+`discard_following`, `version`, and
 the ordinary molecule state fields. GET `/state` returns the latest snapshot;
 GET `/image` returns numbered SVG. Requests are serialized client-side and
 server-side. Each successful mutation has one Builder undo step. A browser
@@ -58,12 +59,14 @@ Skip (also "stop talking", "be quiet", "shush") stops feedback while command
 mode remains active, without an AI request. Stop still turns off the microphone.
 Skip is ignored while paused, consistently with other non-control commands.
 
-Clear steps before the first ambiguity execute; the ambiguous step and all
-following instructions are held. The question explicitly announces queued
-instructions. A clarification resolves the first blocked request, then retained
-instructions are reinterpreted against the updated state and run in order.
-RDKit rejections also block dependent steps. Interpretation failures preserve
-the original request without mutating the molecule. Network failures are not
+Clear steps before the first ambiguity execute. Only the confusing statement
+is retained for clarification; every later instruction is discarded and must
+be spoken again. `queued` stays empty (kept for compatibility), `clarification`
+contains the outstanding question, and `discard_following:true` tells clients
+to drop waiting speech captured before that event. Fresh clarification is
+accepted normally. RDKit rejection follows the same discard rule. Whole-plan
+interpretation failures discard the request without mutating the molecule.
+Network failures are not
 automatically retried, to avoid duplicating an edit after a lost response.
 
 Use headphones during continuous listening to avoid TTS entering the mic.

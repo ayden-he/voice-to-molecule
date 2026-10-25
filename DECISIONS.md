@@ -1,5 +1,17 @@
 # Decisions
 
+## Discard instructions after the first confusion
+
+- User replaced the prior queued-tail behavior: keep already applied clear
+  actions, ask about only the confusing statement, and forget everything after
+  it. Never replay those later instructions after clarification. Tell the user
+  they were discarded and must be repeated if still wanted.
+- Apply the same rule to rejected chemistry edits. If no trustworthy plan can
+  be produced, discard the entire unexecuted request instead of retaining it.
+  Emit `discard_following` so both browser frontends invalidate waiting speech
+  requests; later fresh responses are accepted normally. Keep `queued: []`
+  for API compatibility and expose the outstanding question as `clarification`.
+
 ## React frontend merge with Windows speech preserved
 
 - Keep `speech.py` and its Windows PowerShell/System.Speech implementation

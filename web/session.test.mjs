@@ -35,7 +35,21 @@ export async function runSessionTests(create = createSession) {
   await session.settled();
   assert(interrupted === beforeSkip + 1 && session.mode() === 'active', 'skip stops feedback without disabling commands');
   assert(submitted.join() === 'carbon,undo', 'skip uses no AI quota');
-  return '9 session checks passed';
+  const afterAmbiguity = [];
+  const second = create({
+    submit: async text => {
+      afterAmbiguity.push(text);
+      if (text === 'unclear') second.discardFollowing();
+    }, stopSpeech() {}, status() {},
+  });
+  second.enabled(); second.receive('start');
+  second.receive('unclear'); second.receive('add oxygen'); second.receive('add carbon');
+  await second.settled();
+  assert(afterAmbiguity.join() === 'unclear', 'ambiguity discards waiting speech instead of treating it as clarification');
+  second.receive('methyl');
+  await second.settled();
+  assert(afterAmbiguity.join() === 'unclear,methyl', 'fresh clarification still works after discard');
+  return '11 session checks passed';
 }
 
 console.log(await runSessionTests());
