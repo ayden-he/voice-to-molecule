@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
+import { AnimatePresence, motion } from "framer-motion";
 import "./styles.css";
 
 const API = "/api"; // Vite proxies /api → http://127.0.0.1:8001
@@ -7,9 +8,24 @@ const API = "/api"; // Vite proxies /api → http://127.0.0.1:8001
 // ---------------------------------------------------------------------------
 // 3Dmol viewer component
 // ---------------------------------------------------------------------------
-function Viewer3D({ version }) {
+
+// CPK colors for all elements this app supports
+const CPK = {
+  C:  "#909090",  // grey
+  O:  "#FF0D0D",  // red
+  H:  "#FFFFFF",  // white
+  F:  "#90E050",  // green
+  Cl: "#1FF01F",  // bright green
+  Br: "#A62929",  // dark red
+  I:  "#940094",  // purple
+};
+const HEAVY_ELEMENTS = ["C", "O", "F", "Cl", "Br", "I"];
+const HIGHLIGHT_COLOR = "#00FFFF"; // cyan — not used by any CPK element above
+
+function Viewer3D({ version, currentAtom }) {
   const containerRef = useRef(null);
   const viewerRef    = useRef(null);
+  const [empty, setEmpty] = useState(true);
 
   // Initialise 3Dmol once on mount
   useEffect(() => {
@@ -27,19 +43,52 @@ function Viewer3D({ version }) {
       .then(r => r.status === 204 ? null : r.text())
       .then(block => {
         viewer.clear();
-        if (!block) return;
+        if (!block) { setEmpty(true); return; }
+        setEmpty(false);
         viewer.addModel(block, "mol");
-        viewer.setStyle({}, { stick: { radius: 0.15 }, sphere: { scale: 0.3 } });
+
+        // Base style — grey for everything, then override per element
+        viewer.setStyle({}, {
+          stick:  { radius: 0.15, color: CPK.C },
+          sphere: { scale: 0.3,  color: CPK.C },
+        });
+
+        // Explicit CPK colors per element
+        Object.entries(CPK).forEach(([elem, color]) => {
+          viewer.setStyle({ elem }, {
+            stick:  { radius: 0.15, color },
+            sphere: { scale: 0.3,  color },
+          });
+        });
+
+        // Highlight the current atom in cyan.
+        // The MOL block includes explicit H atoms for 3D embedding — filter
+        // to only C and O (the only elements this app builds) so the index
+        // matches the builder's 1-based heavy-atom cursor exactly.
+        if (currentAtom != null) {
+          const heavyAtoms = viewer.getModel()
+            .selectedAtoms({ elem: HEAVY_ELEMENTS })
+            .sort((a, b) => a.serial - b.serial);
+          const target = heavyAtoms[currentAtom - 1];
+          if (target != null) {
+            viewer.setStyle({ serial: target.serial }, {
+              stick:  { radius: 0.18, color: HIGHLIGHT_COLOR },
+              sphere: { scale: 0.38, color: HIGHLIGHT_COLOR },
+            });
+          }
+        }
+
         viewer.zoomTo();
         viewer.spin("y", 0.5);
         viewer.render();
       })
       .catch(() => {});
-  }, [version]);
+  }, [version, currentAtom]);
 
   return (
     <div className="viewer-3d-wrap">
-      <div ref={containerRef} className="viewer-3d" />
+      {empty && <span className="panel-empty">No molecule yet</span>}
+      <div ref={containerRef} className="viewer-3d" style={{ opacity: empty ? 0 : 1 }} />
     </div>
   );
 }
@@ -120,7 +169,10 @@ function TranscriptLog({ entries }) {
 
   return (
     <div className="transcript-log" aria-live="polite" aria-label="Transcript">
-      <div className="transcript-inner">
+      <div className={`transcript-inner${entries.length === 0 ? " is-empty" : ""}`}>
+        {entries.length === 0 && (
+          <p className="t-empty">No molecule yet</p>
+        )}
         {entries.map((entry, i) =>
           entry.type === "heard"
             ? <p key={i} className="t-heard">{entry.text}</p>
@@ -165,39 +217,84 @@ function molecularFormula(atoms) {
 }
 
 // ---------------------------------------------------------------------------
-// Bottom-right: formula + common name
+// Bottom-right: formula + common name + IUPAC with staggered fade-in
 // ---------------------------------------------------------------------------
+const INFO_VARIANTS = {
+  hidden: { opacity: 0, y: 10 },
+  show:   (i) => ({
+    opacity: 1, y: 0,
+    transition: { delay: i * 0.1, duration: 0.35, ease: "easeOut" },
+  }),
+  exit:   { opacity: 0, y: -6, transition: { duration: 0.2 } },
+};
+
 function MoleculeInfo({ atoms, smiles }) {
   const [commonName, setCommonName] = useState(null);
+  const [iupacName, setIupacName]   = useState(null);
   const prevSmiles = useRef(null);
 
   useEffect(() => {
     if (!smiles || smiles === prevSmiles.current) return;
     prevSmiles.current = smiles;
     setCommonName(null);
-    // Ask the backend for the common name via the "name" command
+    setIupacName(null);
     fetch(`${API}/command`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: "name" }),
     })
       .then(r => r.json())
-      .then(data => { if (data.common_name) setCommonName(data.common_name); })
+      .then(data => {
+        if (data.common_name) setCommonName(data.common_name);
+        if (data.iupac_name)  setIupacName(data.iupac_name);
+      })
       .catch(() => {});
   }, [smiles]);
 
   const formula = molecularFormula(atoms);
 
-  if (!formula) return (
-    <div className="mol-info empty">No molecule yet</div>
-  );
+  const items = [
+    formula    ? { cls: "mol-formula", text: formula }    : null,
+    commonName ? { cls: "mol-name",    text: commonName } : null,
+    iupacName  ? { cls: "mol-iupac",   text: iupacName }  : null,
+  ].filter(Boolean);
 
   return (
     <div className="mol-info">
-      <span className="mol-formula">{formula}</span>
-      {commonName && (
-        <span className="mol-name"> (<em>{commonName}</em>)</span>
-      )}
+      <AnimatePresence mode="wait">
+        {items.length === 0
+          ? (
+            <motion.span
+              key="empty"
+              className="mol-info-empty"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              No molecule yet
+            </motion.span>
+          )
+          : (
+            <motion.div
+              key={smiles}
+              className="mol-info-inner"
+              initial="hidden"
+              animate="show"
+              exit="exit"
+            >
+              {items.map((item, i) => (
+                <motion.span
+                  key={item.cls}
+                  className={item.cls}
+                  custom={i}
+                  variants={INFO_VARIANTS}
+                >
+                  {item.text}
+                </motion.span>
+              ))}
+            </motion.div>
+          )
+        }
+      </AnimatePresence>
     </div>
   );
 }
@@ -208,6 +305,7 @@ export default function App() {
   const [version, setVersion]         = useState(0);
   const [atoms, setAtoms]             = useState([]);
   const [smiles, setSmiles]           = useState("");
+  const [currentAtom, setCurrentAtom] = useState(null);
   const recogRef                      = useRef(null);
 
   const addEntry = useCallback((type, text) => {
@@ -222,6 +320,7 @@ export default function App() {
         if (state.image_url) setMoleculeUrl(`${API}${state.image_url}&fmt=svg`);
         if (state.atoms)  setAtoms(state.atoms);
         if (state.smiles !== undefined) setSmiles(state.smiles);
+        if (state.current_atom !== undefined) setCurrentAtom(state.current_atom);
       })
       .catch(() => {});
   }, []);
@@ -250,6 +349,7 @@ export default function App() {
           if (event.image_url) setMoleculeUrl(`${API}${event.image_url}&fmt=svg`);
           if (event.atoms !== undefined) setAtoms(event.atoms);
           if (event.smiles !== undefined) setSmiles(event.smiles);
+          if (event.current_atom !== undefined) setCurrentAtom(event.current_atom);
           setVersion(v => v + 1);
         }
       }
@@ -268,16 +368,30 @@ export default function App() {
     if (!SR) return;
     const r = new SR();
     r.lang = "en-US";
-    r.continuous = false;
+    r.continuous = true;
     r.interimResults = false;
     r.onstart  = () => setListening(true);
-    r.onend    = () => setListening(false);
-    r.onerror  = () => setListening(false);
+    r.onend    = () => {
+      // If we're still supposed to be listening, restart automatically
+      if (recogRef.current) r.start();
+      else setListening(false);
+    };
+    r.onerror  = (e) => {
+      // network/no-speech errors are non-fatal in continuous mode — just restart
+      if (e.error === "no-speech" || e.error === "network") return;
+      setListening(false);
+      recogRef.current = null;
+    };
     r.onresult = (e) => {
-      const transcript = e.results[0][0].transcript.trim();
-      if (transcript) {
-        addEntry("heard", transcript);
-        postUtterance(transcript);
+      // Only process the latest final result
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          const transcript = e.results[i][0].transcript.trim();
+          if (transcript) {
+            addEntry("heard", transcript);
+            postUtterance(transcript);
+          }
+        }
       }
     };
     r.start();
@@ -292,6 +406,18 @@ export default function App() {
 
   const toggleMic = useCallback(() => {
     listening ? stopListening() : startListening();
+  }, [listening, startListening, stopListening]);
+
+  // Spacebar toggles the mic
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.code === "Space" && e.target === document.body) {
+        e.preventDefault();
+        listening ? stopListening() : startListening();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [listening, startListening, stopListening]);
 
   const hasSR = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -310,16 +436,40 @@ export default function App() {
 
       {/* CENTER COLUMN */}
       <div className="col-center">
-        {moleculeUrl
-          ? <img className="molecule-img" src={moleculeUrl} alt="Current molecule structure" />
-          : <span className="molecule-empty">No molecule yet</span>
-        }
+        <AnimatePresence mode="wait">
+          {(moleculeUrl && atoms.length > 0)
+            ? (
+              <motion.div
+                key={smiles}
+                className="molecule-frame"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+              >
+                <img className="molecule-img" src={moleculeUrl} alt="Current molecule structure" />
+              </motion.div>
+            )
+            : (
+              <motion.span
+                key="empty"
+                className="center-empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                Press space to start<br/>transcribing your molecule
+              </motion.span>
+            )
+          }
+        </AnimatePresence>
       </div>
 
       {/* RIGHT COLUMN */}
       <div className="col-right">
         <div className="panel top">
-          <Viewer3D version={version} />
+          <Viewer3D version={version} currentAtom={currentAtom} />
         </div>
         <div className="panel bottom">
           <MoleculeInfo atoms={atoms} smiles={smiles} />

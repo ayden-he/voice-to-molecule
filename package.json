@@ -9,6 +9,7 @@
     "preview": "vite preview --config web/vite.config.js"
   },
   "dependencies": {
+    "framer-motion": "^14.6.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

@@ -133,7 +133,7 @@ class CommandEngine:
         drawer = rdMolDraw2D.MolDraw2DSVG(600, 450)
         rdMolDraw2D.PrepareAndDrawMolecule(
             drawer, molecule, highlightAtoms=highlighted,
-            highlightAtomColors={i: (1.0, 0.8, 0.3) for i in highlighted},
+            highlightAtomColors={i: (0.0, 1.0, 1.0) for i in highlighted},
         )
         drawer.FinishDrawing()
         return drawer.GetDrawingText()
