@@ -1,5 +1,28 @@
 # Decisions
 
+## React frontend merge with Windows speech preserved
+
+- Keep `speech.py` and its Windows PowerShell/System.Speech implementation
+  unchanged. Add browser speech synthesis to the incoming React frontend so
+  spoken command feedback works there too, including Chrome on Windows.
+- Reuse the tested session and startup helpers through a browser controller:
+  Start/Pause/Stop, ordered Undo, Skip, muted feedback, typed fallback, NDJSON
+  per-action updates, and the accessible welcome/replay behavior. The React
+  layout, molecule SVG, 3D viewer, and formula/name panels remain available.
+- Stop aborts unfinished recognition and disables restart; accepted requests
+  still finish. Undo interrupts TTS immediately while preserving request order.
+  Keep API calls behind Vite's same-origin proxy, with Gemini keys server-only.
+- Serve a production React build from `web/dist` on the Python voice server
+  when available, with matching `/api` aliases. This lets the existing Python
+  launch command serve the merged UI without a separate Vite process. Build
+  assets stay ignored; `/voice-app.html` retains the original UI.
+- **Validation:** 780 Python tests passed, including Windows System.Speech and
+  same-session `/api` aliases/static frontend serving; 67 mocked JavaScript
+  checks passed, including 23 React-controller checks. Production Vite build
+  passed using checksum-verified portable Node 22 in a temporary directory.
+  Python 3.9 syntax and whitespace checks pass. Live Chrome microphone/audio
+  and Gemini requests were not exercised during this merge.
+
 ## Spoken startup instructions
 
 - Attempt a browser-TTS welcome when the voice page opens, explaining microphone
@@ -617,3 +640,31 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   carbon/oxygen, using `ELEMENT_NAMES` as the allowed set. Structures remain
   fixed curated SMILES validated by RDKit. Python 3.9.6 validation:
   `python3 -m pytest -q` reports **746 passed**.
+
+## Computed 3D structure endpoint
+
+- Added `/structure3d` and `CommandEngine.structure_3d()` to return an
+  RDKit-generated 3D MolBlock for the web app to render and spin. RDKit adds
+  explicit hydrogens, embeds a conformer with a fixed seed, and attempts MMFF
+  optimization. This is a computed conformer with no stereochemistry modeled,
+  not experimental coordinates; it is a sighted-teacher/demo feature. Empty
+  molecules or failed embedding return a graceful HTTP 204.
+- Validation: all four new endpoint tests pass. The full Python 3.9.6 suite
+  reports **777 passed, 1 failed** outside the sandbox (needed for the existing
+  local HTTP server test). The unrelated Gemini rate-limit test fails with
+  `KeyError: 'file'` when `interpreter.http_diagnostic` reads a mocked HTTPError
+  without a response body. No interpreter or conversation code was changed.
+
+## 3D endpoint and Python 3.9 diagnostic fix
+
+- Confirmed the added `/structure3d` endpoint and `CommandEngine.structure_3d`
+  return an RDKit-generated 3D MolBlock for web rendering and spinning: a
+  computed conformer with no stereochemistry modeled, graceful 204 on empty or
+  failed embedding, and intended as a sighted-teacher/demo feature. Retained
+  the existing implementation and four tests without duplicating them.
+- Fixed the Python 3.9 crash in `interpreter.http_diagnostic`: reading a
+  bodyless HTTPError (such as Gemini 429 rate-limit with `fp=None`) could raise
+  an uncaught KeyError. The diagnostic helper now catches all ordinary
+  exceptions and returns a plain fallback string so diagnostic error handling
+  cannot crash the request. Full Python 3.9.6 suite: **778 passed**, with local
+  HTTP test-server access enabled.

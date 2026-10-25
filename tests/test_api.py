@@ -164,3 +164,33 @@ def test_name_command_network_failure_over_api(client, monkeypatch):
     assert "couldn't reach" in data["message"]
     assert data["common_name"] is None
     assert data["smiles"] == "C"
+
+def test_structure3d_returns_molblock_when_built(client):
+    post(client, "build aspirin")
+    resp = client.get("/structure3d")
+    assert resp.status_code == 200
+    assert resp.mimetype == "chemical/x-mdl-molfile"
+    body = resp.data.decode()
+    assert "V2000" in body or "V3000" in body
+    assert "M  END" in body
+
+def test_structure3d_has_3d_coordinates(client):
+    post(client, "build ethanol")
+    body = client.get("/structure3d").data.decode()
+    zs = []
+    for line in body.splitlines():
+        parts = line.split()
+        if len(parts) >= 4 and parts[3].isalpha() and len(parts[3]) <= 2:
+            try:
+                zs.append(abs(float(parts[2])))
+            except ValueError:
+                pass
+    assert any(z > 0.01 for z in zs)
+
+def test_structure3d_empty_molecule_is_204(client):
+    assert client.get("/structure3d").status_code == 204
+
+def test_structure3d_includes_hydrogens(client):
+    post(client, "add carbon")
+    body = client.get("/structure3d").data.decode()
+    assert " H " in body or body.count(" H\n") > 0 or "H  " in body

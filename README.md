@@ -2,6 +2,20 @@
 
 See SPEC.md for the project scope and working rules.
 
+## React frontend
+
+With Node installed, run `npm ci` and `npm run build`. The Python voice server
+then serves the built React frontend at its root URL, including `/api` routes
+on the same port. The original voice page remains at `/voice-app.html`.
+For frontend development, run `npm run dev` and open http://127.0.0.1:5173/;
+Vite forwards `/api` to the voice server on port 8001.
+
+The React page uses browser text-to-speech on Windows, macOS, and Linux for
+startup instructions and backend feedback. Enable the mic, then say Start;
+Pause, Stop, Undo, Skip, mute, replay, and typed fallback remain available.
+Chrome may require an interaction before speaking. Python terminal speech
+retains its Windows System.Speech implementation in `speech.py`.
+
 ## AI voice app
 
 In PowerShell, set your own API key locally (do not commit it or paste it in chat):

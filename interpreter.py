@@ -66,7 +66,11 @@ def http_diagnostic(exc, key):
         message = str(message).replace(key, "[redacted]")
         message = re.sub(r"AIza[A-Za-z0-9_-]+", "[redacted]", message)
         return " ".join(message.split())[:1200]
-    except (ValueError, AttributeError, OSError):
+    except Exception:
+        # This helper only builds a diagnostic string and must never raise.
+        # On Python 3.9, reading an HTTPError with no body raises KeyError deep
+        # in urllib/tempfile (e.g. a 429 rate-limit with fp=None), which was not
+        # caught before; catch everything so error handling cannot crash.
         return "Could not read the error response."
 
 

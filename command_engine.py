@@ -1,6 +1,8 @@
 """Shared deterministic command engine for HTTP and AI voice frontends."""
 
 from typing import Any, Dict, Optional, Tuple
+from rdkit import Chem
+from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import rdMolDraw2D
 import library
 import naming
@@ -131,7 +133,32 @@ class CommandEngine:
         drawer = rdMolDraw2D.MolDraw2DSVG(600, 450)
         rdMolDraw2D.PrepareAndDrawMolecule(
             drawer, molecule, highlightAtoms=highlighted,
-            highlightAtomColors={i: (1.0, 0.8, 0.3) for i in highlighted},
+            highlightAtomColors={i: (0.0, 1.0, 1.0) for i in highlighted},
         )
         drawer.FinishDrawing()
         return drawer.GetDrawingText()
+
+    def structure_3d(self) -> Optional[str]:
+        """Return the current molecule as a 3D MolBlock, or None if unavailable.
+
+        RDKit adds explicit hydrogens and computes a plausible 3D conformer; the
+        browser (3Dmol.js) renders and spins it. This is a computed conformer,
+        not experimental coordinates, and stereochemistry is not modeled -- it
+        is a reasonable 3D shape of the structure the user built. Returns None
+        for an empty molecule or if 3D embedding fails, so the caller degrades
+        gracefully instead of raising.
+        """
+        molecule = self.builder.molecule_copy()
+        if molecule.GetNumAtoms() == 0:
+            return None
+        try:
+            molecule = Chem.AddHs(molecule)
+            if AllChem.EmbedMolecule(molecule, randomSeed=42) != 0:
+                return None
+            try:
+                AllChem.MMFFOptimizeMolecule(molecule)
+            except Exception:
+                pass
+            return Chem.MolToMolBlock(molecule)
+        except Exception:
+            return None

@@ -2,3 +2,5 @@
 __pycache__/
 .pytest_cache/
 outputs/
+node_modules/
+web/dist/

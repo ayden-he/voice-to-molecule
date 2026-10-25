@@ -7,12 +7,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import threading
 import socket
+import mimetypes
 
 from conversation import Conversation
 from interpreter import GeminiInterpreter
 
 
 ROOT = Path(__file__).resolve().parent / "web"
+DIST = ROOT / "dist"
 
 
 class LocalServer(ThreadingHTTPServer):
@@ -47,16 +49,43 @@ def make_server(port=8001, interpret=None):
 
         def do_GET(self):
             path = self.path.split("?", 1)[0]
+            if path.startswith('/api/'):
+                path = path[4:]
             if path == "/health":
                 self.send(200, json.dumps({
                     "provider": "gemini", "model": os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"),
                     "api_key_configured": bool(os.environ.get("GEMINI_API_KEY")),
                 }))
                 return
-            if path in ("/state", "/image"):
+            if path in ("/state", "/image", "/structure3d"):
                 with snapshot_lock:
-                    body = json.dumps(snapshot["state"]) if path == "/state" else snapshot["image"]
-                self.send(200, body, "application/json" if path == "/state" else "image/svg+xml")
+                    if path == "/state":
+                        body = json.dumps(snapshot["state"])
+                        ct = "application/json"
+                    elif path == "/image":
+                        body = snapshot["image"]
+                        ct = "image/svg+xml"
+                    else:
+                        block = conversation.engine.structure_3d()
+                        if block is None:
+                            self.send(204, b"")
+                            return
+                        body = block
+                        ct = "chemical/x-mdl-molfile"
+                self.send(200, body, ct)
+                return
+            # A built React frontend can run on the same Python server without Vite.
+            if (DIST / 'index.html').is_file() and (path in ('/', '/notebook') or path.startswith('/assets/')):
+                candidate = DIST / ('index.html' if path in ('/', '/notebook') else path.lstrip('/'))
+                try:
+                    candidate.resolve().relative_to(DIST.resolve())
+                except ValueError:
+                    self.send(404, '{}')
+                    return
+                if not candidate.is_file():
+                    self.send(404, '{}')
+                    return
+                self.send(200, candidate.read_bytes(), mimetypes.guess_type(str(candidate))[0] or 'application/octet-stream')
                 return
             files = {"/": "voice-app.html", "/voice-app.html": "voice-app.html",
                      "/voice-app.mjs": "voice-app.mjs", "/session.mjs": "session.mjs",
@@ -68,12 +97,15 @@ def make_server(port=8001, interpret=None):
             self.send(200, file.read_bytes(), "text/html" if file.suffix == ".html" else "text/javascript")
 
         def do_POST(self):
+            route = self.path.split('?', 1)[0]
+            if route.startswith('/api/'):
+                route = route[4:]
             # No CORS; reject cross-origin mutation of the shared local session.
             expected = "http://" + self.headers.get("Host", "")
             if self.headers.get("Origin", expected) != expected:
                 self.send(403, '{"message":"Cross-origin request rejected."}')
                 return
-            if self.path not in ("/utterance", "/command"):
+            if route not in ("/utterance", "/command"):
                 self.send(404, '{}')
                 return
             try:
@@ -87,7 +119,7 @@ def make_server(port=8001, interpret=None):
                 self.send(400, '{"message":"Send a nonempty text string."}')
                 return
             with command_lock:
-                if self.path == "/command":
+                if route == "/command":
                     event = conversation.direct_command(text)
                     with snapshot_lock:
                         snapshot.update(state=event, image=conversation.image())
