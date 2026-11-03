@@ -1,6 +1,6 @@
 # ChemSpeak
 
-Chemistry education often depends on seeing and drawing molecular structures. ChemSpeak aims to make molecule building more accessible to blind and low-vision learners and people who find mouse-based drawing difficult. Spoken commands, numbered atoms, and audible readback let users explore a structure, while live 2D and 3D views give teachers and classmates a shared visual reference. This educational prototype still needs usability evaluation with intended users.
+Chemistry education often depends on seeing and drawing molecular structures. ChemSpeak aims to make molecule building more accessible to blind and low-vision learners and people who find mouse-based drawing difficult. Spoken commands, numbered atoms, and audible readback let users explore a structure, while live 2D and 3D views give teachers and classmates a shared visual reference.
 
 ## Setup and use
 
