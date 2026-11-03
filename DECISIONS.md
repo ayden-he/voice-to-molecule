@@ -693,3 +693,9 @@ Implementation is deferred; this revision changes only SPEC.md and DECISIONS.md.
   exceptions and returns a plain fallback string so diagnostic error handling
   cannot crash the request. Full Python 3.9.6 suite: **778 passed**, with local
   HTTP test-server access enabled.
+
+## Final project cleanup and ChemSpeak naming
+
+- Use ChemSpeak in the README, browser page titles, and npm package metadata to match the chosen app name. Keep historical scope and decision records intact.
+- Remove duplicate API drafts, completed role assignment/build guides, the unrelated greeting exercise, and generated caches/images. Keep runnable interfaces, diagnostics, tests, dependency manifests, installed dependencies, and the existing frontend build. This reduces clutter without removing supported entry points or requiring immediate reinstallation.
+- Rewrite the README around social impact, setup, the current architecture, and design tradeoffs. Keep API.md, SPEC.md, and this history as supporting references rather than deleting project knowledge.
